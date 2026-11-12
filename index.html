@@ -1,0 +1,2062 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<meta name="theme-color" content="#151b2b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Little Sparks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Andika:wght@400;700&family=Fredoka:wght@500;600&display=swap" rel="stylesheet">
+<style>
+/* Layout idea: a table of chunky wooden blocks on a pale board. One screen, no scrolling during play. */
+:root{
+  color-scheme: dark;
+  --board:#151b2b; --paper:#252e45; --ink:#f2e9d6; --muted:#a7aec2; --edge:#0b0f1a; --line:#3a4562;
+  --good-bg:#1d4a33; --sel-bg:#1e3a5f; --lit-bg:#5a4716; --cell:#323c57; --grey:#5d6782; --grey-d:#454e66;
+  --act:#f2e9d6; --act-ink:#151b2b; --grass:#22402c;
+  --red:#e0584b;   --red-d:#a93a2f;
+  --yellow:#e8b13f;--yellow-d:#a8781a;
+  --green:#3ea567; --green-d:#277447;
+  --blue:#3f86d4;  --blue-d:#295f9c;
+  --purple:#8461c9;--purple-d:#5c4196;
+  --pink:#dc6896;  --pink-d:#a7466d;
+  --orange:#e2843e;--orange-d:#a95e22;
+  --teal:#24a09b;  --teal-d:#167370;
+  --indigo:#5d6fd9;--indigo-d:#3f4fa6;
+  --lime:#7aa83a;  --lime-d:#557724;
+  --display:"Fredoka","Trebuchet MS","Segoe UI",sans-serif;
+  --body:"Andika","Comic Sans MS","Trebuchet MS",sans-serif; /* infant letterforms: single-storey a and g */
+}
+/* layout idea unchanged: chunky blocks on a board. Dark is the default; light is a grown-ups option */
+:root[data-mode="light"]{
+  color-scheme: light;
+  --board:#e4f1ee; --paper:#ffffff; --ink:#1f2a44; --muted:#5d6b85; --edge:#c3d3d6; --line:#c3d3d6;
+  --good-bg:var(--good-bg); --sel-bg:var(--sel-bg); --lit-bg:var(--lit-bg); --cell:var(--cell); --grey:#9aa7b8; --grey-d:#7c8a9c;
+  --act:#1f2a44; --act-ink:#ffffff; --grass:#a8d8a0;
+  --red:#ef5b4c;   --red-d:#b93c30;
+  --yellow:#f6b93b;--yellow-d:#c28a14;
+  --green:#3fae6a; --green-d:#2a7f4a;
+  --blue:#3d8fe0;  --blue-d:#2867ab;
+  --purple:#8a63d2;--purple-d:#6243a3;
+  --pink:#ee6fa0;  --pink-d:#bd4675;
+  --orange:#f08a3c;--orange-d:#b9621f;
+  --teal:#22a6a1;  --teal-d:#14787a;
+  --indigo:#5b6ee1;--indigo-d:#3f4fb0;
+  --lime:#86b83f;  --lime-d:#5d8327;
+}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;margin:0}
+body{
+  background:var(--board);color:var(--ink);font-family:var(--body);
+  -webkit-user-select:none;user-select:none;-webkit-touch-callout:none;
+  touch-action:manipulation;overflow:hidden;
+}
+#app{height:100%;display:flex;flex-direction:column}
+button{font:inherit;color:inherit}
+button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
+
+/* the block: the one bold element everything is built from */
+.block{
+  border:0;border-radius:22px;background:var(--paper);cursor:pointer;
+  box-shadow:0 8px 0 var(--edge),0 12px 20px rgba(31,42,68,.10);
+  transition:transform .08s,box-shadow .08s,opacity .2s;
+}
+.block:active{transform:translateY(6px);box-shadow:0 2px 0 var(--edge)}
+.block:disabled{cursor:default}
+
+/* ---------- home ---------- */
+.home{flex:1;display:flex;flex-direction:column;gap:18px;padding:20px 20px 16px;min-height:0}
+.home h1{font-family:var(--display);font-weight:600;font-size:clamp(30px,6.5vmin,56px);margin:0;letter-spacing:.01em}
+.home h1 span{color:var(--red)}
+.tiles{flex:1;display:grid;grid-template-columns:repeat(2,1fr);gap:16px;min-height:0;padding-bottom:10px}
+@media (orientation:landscape){.tiles{grid-template-columns:repeat(5,1fr)}}
+
+.tile .ico.dogico{width:1.9em;height:1.9em;display:block}
+.tile .ico.dogico svg{width:100%;height:100%}
+
+/* ---------- my dog ---------- */
+.scene{position:relative;width:min(90vmin,620px);height:min(58vmin,400px);flex:none;border-radius:28px;background:#fdf0cf;overflow:hidden;box-shadow:0 8px 0 var(--edge)}
+.scene .floor{position:absolute;left:0;right:0;bottom:0;height:26%;background:#e2b98a}
+.scene .win{position:absolute;left:6%;top:10%;width:19%;height:32%;background:#cfeaf7;border:6px solid #fff;border-radius:12px;box-shadow:0 3px 0 var(--edge)}
+.scene .win:after{content:"";position:absolute;right:14%;top:14%;width:34%;height:34%;border-radius:50%;background:#f6b93b}
+.scene.night .win{background:#27325a}
+.scene.night .win:after{background:#fdf0cf}
+.scene.out{background:#cfeaf7}
+.scene.out .win{left:auto;right:8%;top:8%;width:15%;height:22%;border:0;background:none;box-shadow:none}
+.scene.out .win:after{right:0;top:0;width:100%;height:100%}
+.scene.out .floor{left:-12%;right:-12%;height:30%;background:#7cc77f;border-radius:50% 50% 0 0/45% 45% 0 0}
+.dog{position:absolute;left:0;right:0;bottom:2%;height:94%;display:flex;justify-content:center;pointer-events:none}
+.dog svg{height:100%;width:auto;display:block;overflow:visible}
+.dog .x{display:none}
+.dog .tail{transform-origin:196px 236px;animation:wag .5s ease-in-out infinite alternate}
+.dog .eye{transform-box:fill-box;transform-origin:center;animation:blink 4s infinite}
+.dog.s-hungry .rumble,.dog.s-hungry .brows,.dog.s-thirsty .tongue,.dog.s-thirsty .drops,.dog.s-thirsty .brows,
+.dog.s-dirty .mud,.dog.s-dirty .brows,.dog.s-scruffy .tufts,.dog.s-scruffy .brows,.dog.s-play .woof,.dog.s-play .tongue,
+.dog.s-walk .leadm,.dog.s-sleepy .lids,.dog.s-sleepy .zzz,.dog.s-poop .brows,
+.dog.happy .hearts,.dog.happy .tongue,.dog.happy .smile,.dog.a-bath .bubbles,.dog.a-brush .sparkle,.dog.a-bath .sparkle,
+.dog.asleep .lids,.dog.asleep .zzz,.dog.asleep .bedx{display:inline}
+.dog.s-sleepy .eye,.dog.asleep .eye,.dog.happy .eye{display:none}
+.dog.s-thirsty .tongue{transform-origin:150px 140px;animation:pant .3s infinite alternate}
+.dog.s-hungry .rumble{animation:fade .6s infinite alternate}
+.dog.s-play svg,.dog.a-ball svg,.dog.a-lead svg{animation:hop .32s ease-out infinite alternate}
+.dog.s-walk .head{transform-origin:150px 160px;animation:tilt 1.2s ease-in-out infinite alternate}
+.dog.happy .tail,.dog.s-play .tail{animation-duration:.16s}
+.dog.happy .hearts{animation:rise 1.6s ease-out infinite}
+.dog.asleep .tail{animation:none}
+.dog .zzz{animation:fade 1.2s infinite alternate}
+.prop{position:absolute;left:5%;bottom:5%;width:23%}
+.prop.r{left:auto;right:6%}
+.prop svg{width:100%;display:block;overflow:visible}
+.prop.bounce svg{animation:hop .3s ease-out infinite alternate}
+.bubble{position:absolute;right:4%;top:6%;width:24%;background:#fff;border-radius:50%;padding:3%;box-shadow:0 4px 0 var(--edge)}
+.bubble svg{width:100%;display:block}
+.tray{display:grid;gap:14px;justify-content:center}
+.tool{width:min(17vmin,130px);height:min(17vmin,130px);padding:8%;display:grid;place-items:center}
+.tool svg{width:100%;height:100%;display:block;overflow:visible}
+.tool.hint{animation:pulse 1s infinite}
+.kib{display:flex;gap:8px;justify-content:center;min-height:30px;flex-wrap:wrap}
+.kib i{width:26px;height:26px;border-radius:50%;background:#a9713f;display:block}
+.coats{display:flex;gap:16px;justify-content:center}
+.coat{width:64px;height:64px;border-radius:50%;border:5px solid var(--paper);box-shadow:0 0 0 3px var(--line);cursor:pointer;padding:0}
+.coat.on{box-shadow:0 0 0 5px var(--ink)}
+.nameline{min-width:min(60vmin,420px);min-height:min(13vmin,92px);border-bottom:5px solid var(--ink);text-align:center;font-weight:700;font-size:min(10vmin,72px);line-height:1.2}
+.scene.small{width:min(46vmin,300px);height:min(40vmin,260px)}
+
+/* ---------- tunes ---------- */
+.xylo{display:flex;align-items:flex-end;justify-content:center;gap:1.6vmin;height:min(50vmin,380px);flex:none}
+.xbar{width:min(9.6vmin,76px);border:0;border-radius:14px;box-shadow:0 6px 0 rgba(31,42,68,.28);cursor:pointer;padding:0;transition:transform .08s,filter .08s}
+.xbar:disabled{opacity:.16;cursor:default}
+.xbar.lit{transform:translateY(-12px) scale(1.05);filter:brightness(1.3)}
+.xbar.next{outline:6px solid var(--ink);outline-offset:3px;animation:pulse .8s infinite}
+.choice.lit{background:var(--lit-bg);transform:scale(1.08)}
+@keyframes wag{from{transform:rotate(-10deg)}to{transform:rotate(14deg)}}
+@keyframes blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.1)}}
+@keyframes pant{from{transform:scaleY(.8)}to{transform:scaleY(1.15)}}
+@keyframes hop{from{transform:translateY(0)}to{transform:translateY(-6%)}}
+@keyframes tilt{from{transform:rotate(-6deg)}to{transform:rotate(6deg)}}
+@keyframes fade{from{opacity:.25}to{opacity:1}}
+@keyframes rise{0%{transform:translateY(10px);opacity:0}30%{opacity:1}100%{transform:translateY(-26px);opacity:0}}
+.tile{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;
+  background:var(--c);box-shadow:0 8px 0 var(--cd),0 12px 20px rgba(31,42,68,.12);
+  color:#fff;min-height:0;padding:10px;
+}
+.tile:active{box-shadow:0 2px 0 var(--cd)}
+.tile .ico{font-family:var(--body);font-weight:700;font-size:clamp(28px,8vmin,64px);line-height:1;display:flex;gap:.18em;align-items:center}
+.tile .ico svg{width:1em;height:1em}
+.tile .nm{font-family:var(--display);font-weight:500;font-size:clamp(16px,3.4vmin,26px);text-align:center;line-height:1.15}
+.homefoot{display:flex;justify-content:flex-end}
+.lbl{font-family:var(--display);font-weight:500;font-size:clamp(16px,3vmin,22px);color:var(--muted);margin:0 0 -8px}
+.today{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;padding-bottom:10px}
+.dtile{position:relative;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:14px 6px;color:var(--ink)}
+.dtile .ico{display:flex;gap:5px}
+.dtile .ico i{width:clamp(16px,4.4vmin,34px);height:clamp(16px,4.4vmin,34px);border-radius:7px;display:block}
+.dtile .nm{font-family:var(--display);font-weight:500;font-size:clamp(14px,3.2vmin,24px);text-align:center;line-height:1.15}
+.dtile.fin{background:var(--good-bg);box-shadow:0 8px 0 var(--green),0 12px 20px rgba(31,42,68,.10)}
+.dtile .tick{position:absolute;top:8px;right:10px;font-family:var(--display);color:var(--green-d);font-size:clamp(14px,3vmin,22px)}
+
+/* hold-to-open for grown-ups */
+.hold{
+  position:relative;overflow:hidden;border:2px solid var(--line);background:transparent;border-radius:999px;
+  padding:8px 16px;font-size:15px;color:var(--muted);cursor:pointer;
+}
+.hold i{position:absolute;left:0;top:0;bottom:0;width:0;background:var(--cell);z-index:0}
+.hold.going i{width:100%;transition:width 3s linear}
+.hold b{position:relative;font-weight:400;z-index:1}
+
+/* ---------- game shell ---------- */
+.bar{display:flex;align-items:center;gap:12px;padding:14px 16px 6px}
+.rbtn{width:60px;height:60px;border-radius:50%;display:grid;place-items:center;flex:none}
+.rbtn svg{width:30px;height:30px}
+.dots{flex:1;display:flex;justify-content:center;gap:10px}
+.dots i{width:16px;height:16px;border-radius:50%;background:var(--cell)}
+.dots i.on{background:var(--green)}
+.prompt{font-family:var(--display);font-weight:500;text-align:center;font-size:clamp(22px,5vmin,40px);padding:4px 16px 0;margin:0;text-wrap:balance}
+.stage{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:space-evenly;gap:16px;padding:12px 16px 24px;overflow:auto}
+
+.show{display:flex;align-items:center;justify-content:center;gap:4vmin;flex-wrap:wrap}
+.show.col{flex-direction:column;gap:2vmin}
+.pic{font-size:min(24vmin,170px);line-height:1.1;background:none;border:0;padding:0;cursor:pointer}
+.group{display:grid;gap:1vmin 1.6vmin;font-size:min(9vmin,66px);line-height:1.15}
+.group.many{font-size:min(6.6vmin,48px);gap:.4vmin 1.4vmin}
+.group .gone{opacity:.22;position:relative}
+.group .gone:after{content:"";position:absolute;left:0;right:0;top:50%;border-top:5px solid var(--red);transform:rotate(-35deg)}
+.plus{font-family:var(--display);font-size:min(12vmin,80px);color:var(--muted)}
+.eq{font-weight:700;font-size:min(15vmin,110px);line-height:1.1;letter-spacing:.04em}
+.nums{display:flex;gap:1.6vmin;justify-content:center}
+.nums div{width:min(15vmin,110px);height:min(15vmin,110px);border-radius:18px;background:var(--paper);box-shadow:0 6px 0 var(--edge);display:grid;place-items:center;font-weight:700;font-size:min(8vmin,58px)}
+.nums div.q{background:transparent;box-shadow:none;border:4px dashed var(--muted);color:var(--muted)}
+
+.choices{display:flex;flex-wrap:wrap;justify-content:center;gap:18px}
+.choices.c3{display:grid;grid-template-columns:repeat(3,auto)}
+.choice{width:min(21vmin,170px);height:min(21vmin,170px);display:grid;place-items:center;padding:8px}
+.choice.wide{width:auto;height:auto;min-width:min(34vmin,240px);padding:14px 22px}
+.choice.wide .group{font-size:min(6vmin,44px)}
+.choice .num,.choice .ltr{font-weight:700;font-size:min(12vmin,96px);line-height:1}
+.choice .wordtxt{font-weight:700;font-size:min(9vmin,64px);line-height:1.2}
+.choice .shape{width:78%;height:78%}
+.shape{display:block}
+.shape svg{width:100%;height:100%;display:block}
+.choice.right{background:var(--good-bg);box-shadow:0 8px 0 var(--green),0 12px 20px rgba(31,42,68,.10);animation:pop .45s}
+.choice.nope{opacity:.3;animation:shake .35s}
+.choice.hint{animation:pulse 1s infinite}
+
+/* pattern row */
+.seq{display:flex;gap:1.6vmin;align-items:center;justify-content:center;flex-wrap:nowrap}
+.seq .cell{width:min(10vmin,84px);height:min(10vmin,84px);flex:none}
+.seq .gap{border:4px dashed var(--muted);border-radius:16px;display:grid;place-items:center;font-family:var(--display);font-size:min(7vmin,54px);color:var(--muted)}
+.seq .gap.filled{border-color:transparent}
+.seq .gap .shape{width:100%;height:100%}
+
+/* spelling */
+.slots{display:flex;gap:12px}
+.slot,.ltile{width:min(17vmin,130px);height:min(17vmin,130px);font-weight:700;font-size:min(11vmin,88px);line-height:1;display:grid;place-items:center;padding:0}
+.five .slot,.five .ltile{width:min(14.5vmin,112px);height:min(14.5vmin,112px);font-size:min(9.5vmin,74px)}
+.slot{border-radius:18px;border:4px dashed var(--muted)}
+.slot.filled{border:4px solid var(--green);background:var(--good-bg)}
+.ltile.used{opacity:.15}
+.shake{animation:shake .35s}
+
+/* pairs */
+.cards{display:grid;gap:12px}
+.card{line-height:1;display:grid;place-items:center;padding:0;background:var(--purple);box-shadow:0 6px 0 var(--purple-d);border-radius:16px;font-weight:700}
+.card span{visibility:hidden}
+.card.up{background:var(--paper);box-shadow:0 6px 0 var(--edge)}
+.card.up span{visibility:visible}
+.card.gone{background:var(--good-bg);box-shadow:0 6px 0 var(--green)}
+
+/* copy it */
+.copy{display:flex;gap:4vmin;align-items:center;justify-content:center;flex-wrap:wrap}
+.copy.mirror{flex-wrap:nowrap;gap:2vmin}
+.mline{align-self:stretch;border-left:5px dashed var(--muted)}
+.gridbox{display:flex;flex-direction:column;align-items:center;gap:8px}
+.gridbox .cap{font-family:var(--display);font-size:clamp(16px,3.2vmin,24px);color:var(--muted)}
+.grid{display:grid;gap:5px;background:var(--paper);padding:9px;border-radius:20px;box-shadow:0 8px 0 var(--edge)}
+.grid button,.grid div{border-radius:9px;border:0;background:var(--cell);padding:0}
+.grid button{cursor:pointer}
+.grid.done{box-shadow:0 8px 0 var(--green);animation:pop .45s}
+.paints{display:flex;gap:16px}
+.paint{width:64px;height:64px;border-radius:50%;border:5px solid var(--paper);box-shadow:0 0 0 3px var(--line);cursor:pointer;padding:0}
+.paint.on{box-shadow:0 0 0 5px var(--ink)}
+
+/* daily: word of the day */
+.wboard{display:grid;gap:8px}
+.wrow{display:flex;gap:8px}
+.wcell{width:min(9vmin,64px);height:min(9vmin,64px);border-radius:12px;background:var(--paper);border:3px solid var(--line);display:grid;place-items:center;font-weight:700;font-size:min(6vmin,42px);line-height:1}
+.wcell.g{background:var(--green);border-color:var(--green-d);color:#fff}
+.wcell.y{background:var(--yellow);border-color:var(--yellow-d);color:#1f2a44}
+.wcell.n{background:var(--grey);border-color:var(--grey-d);color:#fff}
+.keys{display:grid;grid-template-columns:repeat(7,auto);gap:6px;justify-content:center}
+.key{width:min(11vmin,80px);height:min(10vmin,70px);border-radius:12px;border:0;background:var(--paper);box-shadow:0 4px 0 var(--edge);font-weight:700;font-size:min(6vmin,40px);line-height:1;cursor:pointer;padding:0}
+.key:active{transform:translateY(3px);box-shadow:0 1px 0 var(--edge)}
+.key.g{background:var(--green);color:#fff;box-shadow:0 4px 0 var(--green-d)}
+.key.y{background:var(--yellow);color:#1f2a44;box-shadow:0 4px 0 var(--yellow-d)}
+.key.n{background:var(--grey);color:#fff;box-shadow:0 4px 0 var(--grey-d)}
+.key.act{width:min(24vmin,170px);background:var(--act);color:var(--act-ink);box-shadow:0 4px 0 var(--edge);font-family:var(--display);font-size:min(4.4vmin,28px)}
+.acts{display:flex;gap:20px;justify-content:center}
+.note{font-size:clamp(16px,3.4vmin,24px);color:var(--muted);min-height:1.4em;text-align:center;margin:0}
+.cluepic{font-size:min(14vmin,96px);line-height:1}
+
+/* daily: sort it */
+.bands{display:flex;flex-direction:column;gap:10px;width:100%;max-width:600px}
+.band{border-radius:18px;padding:10px 16px;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:10px;animation:pop .45s}
+.band b{font-family:var(--display);font-weight:500;font-size:clamp(18px,4vmin,28px)}
+.band span{font-size:min(8vmin,50px);line-height:1}
+.sgrid{display:grid;grid-template-columns:repeat(3,auto);gap:16px}
+.sgrid.c4{grid-template-columns:repeat(4,auto);gap:12px}
+.stile{width:min(22vmin,160px);height:min(22vmin,160px);font-size:min(13vmin,96px);line-height:1;display:grid;place-items:center;padding:0}
+.c4 .stile{width:min(18vmin,136px);height:min(18vmin,136px);font-size:min(11vmin,80px)}
+.stile.sel{background:var(--sel-bg);box-shadow:0 8px 0 var(--blue),0 12px 20px rgba(31,42,68,.10)}
+
+/* daily: word garden */
+.found{display:flex;flex-wrap:wrap;gap:8px;justify-content:center;min-height:44px}
+.found span{background:var(--good-bg);border:2px solid var(--green);border-radius:999px;padding:4px 14px;font-weight:700;font-size:clamp(18px,4vmin,28px)}
+.found span.todo{background:transparent;border:2px dashed var(--muted);color:transparent;min-width:3.2em}
+.entry{min-width:min(60vmin,420px);min-height:min(15vmin,104px);border-bottom:5px solid var(--ink);text-align:center;font-weight:700;font-size:min(12vmin,88px);line-height:1.15;letter-spacing:.06em}
+.gl{display:flex;gap:12px;justify-content:center}
+.gl .ltile{width:min(15.5vmin,120px);height:min(15.5vmin,120px);font-size:min(10vmin,80px)}
+.gl .ltile.mid{color:#1f2a44;background:var(--yellow);box-shadow:0 8px 0 var(--yellow-d),0 12px 20px rgba(31,42,68,.10)}
+
+/* end screens */
+.end{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px;text-align:center}
+.end .big{font-size:min(34vmin,220px);line-height:1;animation:pop .6s}
+.end h2{font-family:var(--display);font-weight:600;font-size:clamp(30px,7vmin,60px);margin:0;text-wrap:balance}
+.end p{font-size:clamp(18px,3.6vmin,28px);margin:0;color:var(--muted);max-width:22em}
+.endbtns{display:flex;gap:20px;flex-wrap:wrap;justify-content:center}
+.go{padding:18px 34px;font-family:var(--display);font-size:clamp(20px,4vmin,30px);color:#fff;background:var(--blue);box-shadow:0 8px 0 var(--blue-d)}
+.go:active{box-shadow:0 2px 0 var(--blue-d)}
+.go.alt{background:var(--paper);color:var(--ink);box-shadow:0 8px 0 var(--edge)}
+
+/* grown-ups panel */
+.parent{flex:1;overflow:auto;padding:20px;display:flex;flex-direction:column;gap:16px;max-width:760px;width:100%;margin:0 auto;font-size:17px}
+.parent h2{font-family:var(--display);font-weight:600;font-size:30px;margin:0}
+.parent h3{font-family:var(--display);font-weight:500;font-size:20px;margin:10px 0 0}
+.parent p{margin:0;color:var(--muted);max-width:65ch}
+.prow{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--paper);border-radius:16px;padding:12px 14px}
+.plabel{font-weight:700}
+.seg{display:flex;gap:6px;flex-wrap:wrap}
+.segb{border:2px solid var(--line);background:var(--paper);border-radius:12px;padding:8px 12px;cursor:pointer;font-size:15px}
+.segb.on{background:var(--ink);border-color:var(--ink);color:var(--board)}
+.parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
+
+/* ---------- v3 additions ---------- */
+/* guess the word: typing goes straight into the grid */
+.wwrap{position:relative;flex:none}
+.wboard{--c:56px;gap:6px}
+.wboard .wrow{gap:6px}
+.wboard .wcell{width:var(--c);height:var(--c);font-size:calc(var(--c)*.6);border-radius:calc(var(--c)*.18)}
+.wcell.now{border-color:var(--line)}
+.wcell.typed{border-color:var(--blue)}
+.wform{position:absolute;inset:0;margin:0}
+.ghost{position:absolute;inset:0;width:100%;height:100%;margin:0;padding:0;border:0;opacity:0;font-size:16px;background:transparent;color:transparent;caret-color:transparent;cursor:pointer;-webkit-user-select:text;user-select:text}
+.stage.tight{gap:10px;padding-top:6px}
+@media (max-height:760px){.rbtn{width:48px;height:48px}.rbtn svg{width:24px;height:24px}.bar{padding:8px 12px 2px}.prompt{font-size:clamp(18px,4.4vmin,30px)}}
+
+.warm{position:fixed;inset:0;pointer-events:none;background:#ff9a3c;mix-blend-mode:multiply;opacity:.12;z-index:50}
+.stage.top{justify-content:flex-start}
+.rbtn.talking{animation:pulse .8s infinite;background:var(--sel-bg)}
+.prompt.flash{animation:pop .5s;color:var(--yellow)}
+.typein{width:min(62vmin,380px);font-family:var(--body);font-weight:700;font-size:min(8vmin,48px);text-align:center;letter-spacing:.12em;padding:8px 14px;border-radius:16px;border:4px solid var(--line);background:var(--paper);color:var(--ink);-webkit-user-select:text;user-select:text;outline:none}
+.typein:focus{border-color:var(--blue)}
+.typein::placeholder{color:var(--muted);letter-spacing:0;font-weight:400;font-size:.5em}
+.entryrow{display:flex;gap:14px;align-items:center;justify-content:center;flex-wrap:wrap}
+.entryrow .go{padding:12px 26px}
+.abc{display:grid;grid-template-columns:repeat(13,auto);gap:5px;justify-content:center}
+.abc span{width:min(6.4vmin,40px);height:min(6.4vmin,40px);border-radius:8px;display:grid;place-items:center;font-weight:700;font-size:min(4.2vmin,24px);background:var(--paper);color:var(--muted)}
+.abc span.g{background:var(--green);color:#fff}
+.abc span.y{background:var(--yellow);color:#1f2a44}
+.abc span.n{background:transparent;color:var(--grey);text-decoration:line-through}
+.pstat{flex-basis:100%;margin:0;color:var(--muted)}
+.tile .ico.molei{width:1.7em;height:1.7em;display:block}
+.tile .ico.molei svg{width:100%;height:100%}
+.tile .ico.molei .xeyes{display:none}
+/* light up */
+.pads{display:grid;grid-template-columns:repeat(2,auto);gap:min(4vmin,26px)}
+.pad{width:min(32vmin,220px);height:min(32vmin,220px);border:0;cursor:pointer;opacity:.5;box-shadow:0 8px 0 rgba(0,0,0,.35);transition:opacity .08s,transform .08s,filter .08s;padding:0;touch-action:none}
+.pad:nth-child(1){border-radius:100% 22px 22px 22px}
+.pad:nth-child(2){border-radius:22px 100% 22px 22px}
+.pad:nth-child(3){border-radius:22px 22px 22px 100%}
+.pad:nth-child(4){border-radius:22px 22px 100% 22px}
+.pad.lit{opacity:1;filter:brightness(1.3) saturate(1.2);transform:scale(1.05)}
+/* brick bash */
+.arena{position:relative;flex:1;width:100%;max-width:1000px;min-height:240px;border-radius:24px;overflow:hidden;background:var(--paper);box-shadow:0 8px 0 var(--edge);touch-action:none}
+.arena canvas{position:absolute;inset:0;display:block;width:100%;height:100%}
+/* mole pop */
+.mhud{display:flex;gap:18px;align-items:center;justify-content:center;width:min(92vmin,640px)}
+.msc{font-family:var(--display);font-weight:600;font-size:clamp(28px,6vmin,48px);min-width:2em;text-align:center}
+.mbest{color:var(--muted);font-size:clamp(15px,3vmin,22px);white-space:nowrap}
+.tbar{flex:1;height:18px;border-radius:9px;background:var(--cell);overflow:hidden}
+.tbar i{display:block;height:100%;width:100%;background:var(--green);transform-origin:left center;transition:transform .1s linear}
+.field{display:grid;grid-template-columns:repeat(3,auto);gap:min(3vmin,22px);padding:min(3.5vmin,24px);border-radius:28px;background:var(--grass);box-shadow:0 8px 0 var(--edge)}
+.hole{position:relative;width:min(24vmin,170px);height:min(24vmin,170px);cursor:pointer;touch-action:none}
+.hole .pit{position:absolute;left:6%;right:6%;bottom:10%;height:24%;border-radius:50%;background:#1d130d}
+.hole .win2{position:absolute;left:14%;right:14%;top:0;bottom:22%;overflow:hidden}
+.hole .crit{position:absolute;left:0;right:0;bottom:0;height:100%;transform:translateY(105%);transition:transform .12s ease-out}
+.hole .crit svg{width:100%;height:100%;display:block}
+.hole.up .crit{transform:translateY(6%)}
+.hole.hit .crit{transform:translateY(32%) scaleY(.85);transition:transform .08s}
+.hole .crit .xeyes{display:none}
+.hole.hit:not(.hog) .crit .eyes{display:none}
+.hole.hit:not(.hog) .crit .xeyes{display:inline}
+.hole .lip{position:absolute;left:6%;right:6%;bottom:10%;height:12%;border-radius:0 0 50% 50%/0 0 100% 100%;background:#7a4a2a}
+.hole .pow{position:absolute;left:50%;top:0;font-family:var(--display);font-weight:600;font-size:min(6vmin,38px);color:var(--yellow);pointer-events:none;opacity:0;transform:translateX(-50%)}
+.hole.hog .pow{color:var(--red)}
+.hole.hit .pow{animation:powup .7s ease-out}
+@keyframes powup{0%{opacity:0;transform:translate(-50%,10px)}25%{opacity:1}100%{opacity:0;transform:translate(-50%,-26px)}}
+
+@keyframes pop{0%{transform:scale(.9)}55%{transform:scale(1.08)}100%{transform:scale(1)}}
+@keyframes shake{0%,100%{transform:translateX(0)}25%{transform:translateX(-8px)}75%{transform:translateX(8px)}}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.07)}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="warm" class="warm" aria-hidden="true"></div>
+<script>
+(function(){
+'use strict';
+
+/* ---------- helpers ---------- */
+var $app=document.getElementById('app');
+function h(tag,props,kids){
+  var e=document.createElement(tag),k;
+  if(props){for(k in props){
+    if(k==='class')e.className=props[k];
+    else if(k==='html')e.innerHTML=props[k];
+    else if(k==='text')e.textContent=props[k];
+    else if(k==='style')e.style.cssText=props[k];
+    else e.setAttribute(k,props[k]);
+  }}
+  (kids||[]).forEach(function(c){if(c)e.appendChild(typeof c==='string'?document.createTextNode(c):c);});
+  return e;
+}
+function rnd(n){return Math.floor(Math.random()*n);}
+function between(a,b){return a+rnd(b-a+1);}
+function pick(a){return a[rnd(a.length)];}
+function shuffle(a){a=a.slice();for(var i=a.length-1;i>0;i--){var j=rnd(i+1),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function sample(a,n){return shuffle(a).slice(0,n);}
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+
+/* ---------- settings (kept on this device only) ---------- */
+var KEY='littlesparks.v2';
+var S={diff:3,adapt:true,off:{},streak:{},voice:true,sfx:true,limit:20,day:'',used:0,bonus:0,theme:'dark',warm:true};
+(function(){try{var r=JSON.parse(localStorage.getItem(KEY));if(r){for(var k in r)S[k]=r[k];}}catch(e){}})();
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S));}catch(e){}}
+function today(){return new Date().toDateString();}
+function rollDay(){if(S.day!==today()){S.day=today();S.used=0;S.bonus=0;save();}}
+function limitReached(){rollDay();return S.limit>0&&S.used>=S.limit*60+S.bonus;}
+/* one global difficulty (1 to 5); each game may drift one step either side of it */
+function levelOf(id){return clamp(S.diff+(S.adapt?(S.off[id]||0):0),1,5);}
+var DIFFNAME=['','Starter','Easy','Steady','Tricky','Expert'];
+
+var screen='home';
+setInterval(function(){
+  if(screen!=='game'||document.hidden)return;
+  rollDay();S.used++;if(S.used%10===0)save();
+},1000);
+
+/* ---------- sound and voice ---------- */
+var ac=null;
+function tone(f,t0,d,vol){
+  var o=ac.createOscillator(),g=ac.createGain();
+  o.type='sine';o.frequency.value=f;
+  g.gain.setValueAtTime(0.0001,t0);
+  g.gain.exponentialRampToValueAtTime(vol||0.18,t0+0.02);
+  g.gain.exponentialRampToValueAtTime(0.0001,t0+d);
+  o.connect(g);g.connect(ac.destination);o.start(t0);o.stop(t0+d+0.05);
+}
+function audio(){
+  if(!ac){var C=window.AudioContext||window.webkitAudioContext;if(!C)return false;ac=new C();}
+  if(ac.state==='suspended')ac.resume();
+  return true;
+}
+/* xylophone notes for the music game: always sound, even with effects off */
+var NOTES=[261.63,293.66,329.63,349.23,392,440,493.88,523.25];
+function ping(i,long){
+  try{
+    if(!audio())return;
+    var t=ac.currentTime,d=long?1.1:.7;
+    [[1,.3,d],[4,.05,.18]].forEach(function(p){
+      var o=ac.createOscillator(),g=ac.createGain();
+      o.type='sine';o.frequency.value=NOTES[i]*p[0];
+      g.gain.setValueAtTime(0.0001,t);
+      g.gain.exponentialRampToValueAtTime(p[1],t+0.012);
+      g.gain.exponentialRampToValueAtTime(0.0001,t+p[2]);
+      o.connect(g);g.connect(ac.destination);o.start(t);o.stop(t+p[2]+0.05);
+    });
+  }catch(e){}
+}
+function sfx(k){
+  if(!S.sfx)return;
+  try{
+    if(!audio())return;
+    var t=ac.currentTime;
+    if(k==='good'){tone(660,t,.18);tone(880,t+.12,.26);}
+    else if(k==='tick'){tone(700,t,.1);}
+    else if(k==='soft'){tone(220,t,.16,.07);}
+    else if(k==='win'){[523,659,784,1047].forEach(function(f,i){tone(f,t+i*.13,.3);});}
+  }catch(e){}
+}
+/* ---------- voice: uses the device's own speech engine ---------- */
+var lastSpoken='',VOICE=null,voiceOK=null,keepU=[],earEl=null;
+var HAS_TTS=!!(window.speechSynthesis&&window.SpeechSynthesisUtterance);
+function voiceList(){try{return window.speechSynthesis.getVoices()||[];}catch(e){return[];}}
+function pickVoice(){
+  var vs=voiceList();if(!vs.length)return;
+  function L(v){return(v.lang||'').replace('_','-').toLowerCase();}
+  function f(t){for(var i=0;i<vs.length;i++)if(t(vs[i]))return vs[i];return null;}
+  VOICE=f(function(v){return L(v).indexOf('en-gb')===0&&v.localService;})||f(function(v){return L(v).indexOf('en-gb')===0;})||
+    f(function(v){return L(v).indexOf('en')===0&&v.localService;})||f(function(v){return L(v).indexOf('en')===0;})||
+    f(function(v){return v.default;})||vs[0];
+}
+if(HAS_TTS){
+  pickVoice();
+  try{window.speechSynthesis.addEventListener('voiceschanged',pickVoice);}catch(e){try{window.speechSynthesis.onvoiceschanged=pickVoice;}catch(x){}}
+}
+/* some browsers only allow speech after the first tap: say nothing once, silently, on that tap */
+document.addEventListener('pointerdown',function unlock(){
+  document.removeEventListener('pointerdown',unlock,true);
+  if(!HAS_TTS)return;
+  try{var u=new SpeechSynthesisUtterance(' ');u.volume=0;window.speechSynthesis.speak(u);}catch(e){}
+},true);
+function earTalk(on){if(earEl)earEl.classList.toggle('talking',!!on);}
+function hush(){try{if(HAS_TTS)window.speechSynthesis.cancel();}catch(e){}earTalk(false);}
+function noVoice(){
+  if(!promptEl)return;
+  promptEl.classList.remove('flash');void promptEl.offsetWidth;promptEl.classList.add('flash');
+}
+function say(text,tapped){
+  if(!S.voice&&!tapped)return;
+  if(!HAS_TTS){if(tapped)noVoice();return;}
+  var ss=window.speechSynthesis,started=false;
+  try{
+    if(!VOICE)pickVoice();
+    var u=new SpeechSynthesisUtterance(text);
+    if(VOICE){u.voice=VOICE;u.lang=VOICE.lang;}else u.lang='en-GB';
+    u.rate=.9;u.pitch=1.05;u.volume=1;
+    u.onstart=function(){started=true;voiceOK=true;earTalk(true);};
+    u.onend=function(){earTalk(false);};
+    u.onerror=function(){earTalk(false);};
+    keepU.push(u);if(keepU.length>6)keepU.shift();
+    var go=function(){try{ss.speak(u);if(ss.paused)ss.resume();}catch(e){}};
+    if(ss.speaking||ss.pending){ss.cancel();setTimeout(go,120);}else go();
+    if(tapped)setTimeout(function(){if(!started){voiceOK=false;noVoice();}},3000);
+  }catch(e){if(tapped)noVoice();}
+}
+
+/* ---------- shapes ---------- */
+var COL={red:'#ef5b4c',yellow:'#f6b93b',green:'#3fae6a',blue:'#3d8fe0',purple:'#8a63d2',pink:'#ee6fa0'};
+var COLS=Object.keys(COL);
+function poly(n,r,rot){var p=[];for(var i=0;i<n;i++){var a=rot+i*2*Math.PI/n;p.push((50+r*Math.cos(a)).toFixed(1)+','+(50+r*Math.sin(a)).toFixed(1));}return p.join(' ');}
+function starPts(){var p=[];for(var i=0;i<10;i++){var r=i%2?19:45,a=-Math.PI/2+i*Math.PI/5;p.push((50+r*Math.cos(a)).toFixed(1)+','+(52+r*Math.sin(a)).toFixed(1));}return p.join(' ');}
+var LITE=' fill="#fff" opacity=".38" stroke="none"',DARK=' fill="#000" opacity=".2" stroke="none"';
+var SHAPE={
+  circle:'<circle cx="50" cy="50" r="42"/>',
+  square:'<rect x="11" y="11" width="78" height="78" rx="5"/>',
+  triangle:'<polygon points="50,9 93,87 7,87"/>',
+  rectangle:'<rect x="5" y="27" width="90" height="46" rx="5"/>',
+  oval:'<ellipse cx="50" cy="50" rx="45" ry="28"/>',
+  diamond:'<polygon points="50,5 84,50 50,95 16,50"/>',
+  heart:'<path d="M50 88 C12 60 6 32 26 20 C38 13 48 20 50 31 C52 20 62 13 74 20 C94 32 88 60 50 88Z"/>',
+  star:'<polygon points="'+starPts()+'"/>',
+  pentagon:'<polygon points="'+poly(5,44,-Math.PI/2)+'"/>',
+  hexagon:'<polygon points="'+poly(6,44,0)+'"/>',
+  octagon:'<polygon points="'+poly(8,44,Math.PI/8)+'"/>',
+  semicircle:'<path d="M8 68 A42 42 0 0 1 92 68 Z"/>',
+  crescent:'<path d="M62 9.75 A42 42 0 1 0 62 90.25 A46 46 0 0 1 62 9.75Z"/>',
+  cross:'<polygon points="36,8 64,8 64,36 92,36 92,64 64,64 64,92 36,92 36,64 8,64 8,36 36,36"/>',
+  arrow:'<polygon points="8,38 56,38 56,16 94,50 56,84 56,62 8,62"/>',
+  trapezium:'<polygon points="28,22 72,22 94,80 6,80"/>',
+  parallelogram:'<polygon points="30,24 94,24 70,78 6,78"/>',
+  kite:'<polygon points="50,5 80,38 50,95 20,38"/>',
+  sphere:'<circle cx="50" cy="50" r="42"/><path d="M50 92 A42 42 0 0 0 92 50 A52 52 0 0 1 50 92Z"'+DARK+'/><ellipse cx="35" cy="33" rx="14" ry="8" transform="rotate(-35 35 33)"'+LITE+'/>',
+  cube:'<rect x="12" y="34" width="56" height="56"/><polygon points="12,34 32,12 88,12 68,34"/><polygon points="12,34 32,12 88,12 68,34"'+LITE+'/><polygon points="68,34 88,12 88,68 68,90"/><polygon points="68,34 88,12 88,68 68,90"'+DARK+'/>',
+  cuboid:'<rect x="5" y="44" width="68" height="36"/><polygon points="5,44 23,26 91,26 73,44"/><polygon points="5,44 23,26 91,26 73,44"'+LITE+'/><polygon points="73,44 91,26 91,62 73,80"/><polygon points="73,44 91,26 91,62 73,80"'+DARK+'/>',
+  cylinder:'<path d="M22 24 V78 A28 11 0 0 0 78 78 V24Z"/><path d="M58 34 V88 A28 11 0 0 0 78 78 V24Z"'+DARK+'/><ellipse cx="50" cy="24" rx="28" ry="11"/><ellipse cx="50" cy="24" rx="28" ry="11"'+LITE+'/>',
+  cone:'<path d="M50 8 L22 80 A28 10 0 0 0 78 80Z"/><path d="M50 8 L58 89 A28 10 0 0 0 78 80Z"'+DARK+'/>',
+  pyramid:'<polygon points="50,10 10,82 60,92"/><polygon points="50,10 60,92 92,70"/><polygon points="50,10 60,92 92,70"'+DARK+'/>'
+};
+function shapeEl(name,colour,rot){
+  return h('span',{class:'shape',html:'<svg viewBox="0 0 100 100" aria-hidden="true"><g fill="'+(COL[colour]||colour)+'" stroke="rgba(31,42,68,.28)" stroke-width="2" stroke-linejoin="round"'+(rot?' transform="rotate('+rot+' 50 50)"':'')+'>'+SHAPE[name]+'</g></svg>'});
+}
+
+/* ---------- game shell ---------- */
+var G=null,stageEl=null,promptEl=null,dotsEl=null;
+var ICON={
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/></svg>',
+  ear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9.5v5h3.5L12 18.5v-13L7.5 9.5z"/><path d="M15.5 9a4 4 0 0 1 0 6"/><path d="M18 6.5a7.5 7.5 0 0 1 0 11"/></svg>'
+};
+function setPrompt(text,spoken){promptEl.textContent=text;lastSpoken=spoken||text;say(lastSpoken);}
+function drawDots(){
+  dotsEl.innerHTML='';
+  for(var i=0;i<G.total;i++)dotsEl.appendChild(h('i',{class:i<G.i?'on':''}));
+}
+function startGame(def){
+  if(limitReached())return allDone();
+  screen='game';
+  G={def:def,level:levelOf(def.id),i:0,mistakes:0};
+  G.total=def.rounds(G.level);
+  buildShell();
+  nextQ();
+}
+function homeButton(){
+  var b=h('button',{class:'block go',type:'button',text:'Choose a game'});
+  b.addEventListener('click',home);
+  return b;
+}
+function buildShell(){
+  $app.innerHTML='';
+  var homeB=h('button',{class:'block rbtn',type:'button','aria-label':'Home',html:ICON.home});
+  homeB.addEventListener('click',home);
+  var earB=h('button',{class:'block rbtn',type:'button','aria-label':'Say it again',html:ICON.ear});
+  earB.addEventListener('click',function(){say(lastSpoken,true);});earEl=earB;
+  dotsEl=h('div',{class:'dots'});
+  promptEl=h('p',{class:'prompt'});
+  stageEl=h('div',{class:'stage'});
+  $app.appendChild(h('div',{class:'bar'},[homeB,dotsEl,earB]));
+  $app.appendChild(promptEl);
+  $app.appendChild(stageEl);
+}
+function nextQ(){
+  var g=G;
+  if(g.i>=g.total)return roundEnd();
+  stageEl.innerHTML='';drawDots();
+  g.def.play(g.level,stageEl,function(wait){
+    if(G!==g)return;
+    g.i++;drawDots();
+    setTimeout(function(){if(G===g)nextQ();},wait||900);
+  });
+}
+/* each round walks a shuffled list of question types, so a round is always a mix */
+function fromMix(list){
+  if(!G.mix)G.mix=shuffle(list);
+  return G.mix[G.i%G.mix.length];
+}
+
+/* tap-one-answer question used by several games */
+function choiceQ(stage,o,done){
+  setPrompt(o.prompt,o.spoken);
+  if(o.show)stage.appendChild(o.show);
+  var row=h('div',{class:'choices'+(o.choices.length===6?' c3':'')}),wrong=0,locked=false,g=G;
+  o.choices.forEach(function(c){
+    var b=h('button',{class:'block choice'+(c.wide?' wide':''),type:'button','aria-label':c.label},[c.node]);
+    if(c.ok)b.setAttribute('data-ok','1');
+    b.addEventListener('click',function(){
+      if(locked||G!==g||b.disabled)return;
+      if(c.ok){
+        locked=true;b.classList.remove('hint');b.classList.add('right');sfx('good');
+        if(o.after)o.after();
+        done(o.wait);
+      }else{
+        wrong++;g.mistakes++;b.disabled=true;b.classList.add('nope');sfx('soft');
+        if(wrong>=2){var ok=row.querySelector('[data-ok]');if(ok)ok.classList.add('hint');}
+      }
+    });
+    row.appendChild(b);
+  });
+  stage.appendChild(row);
+}
+
+/* ---------- 1. Count it ---------- */
+var THINGS=[['🍎','apples'],['⭐','stars'],['🐟','fish'],['⚽','balls'],['🐸','frogs'],['🚗','cars'],['🌳','trees'],['🐝','bees']];
+var lastN=-1;
+function groupEl(emojis,gone){
+  var n=emojis.length,g=h('div',{class:'group'+(n>10?' many':''),style:'grid-template-columns:repeat('+Math.min(n,5)+',auto)'});
+  emojis.forEach(function(e,i){g.appendChild(h('span',{class:gone&&i>=n-gone?'gone':'',text:e}));});
+  return g;
+}
+function rep(e,n){var a=[];for(var i=0;i<n;i++)a.push(e);return a;}
+function numChoices(n,cands,k){
+  var seen={},c=[];seen[n]=1;
+  cands.forEach(function(v){if(v>=0&&!seen[v]){seen[v]=1;c.push(v);}});
+  for(var d=1;c.length<k-1;d++){[n+d,n-d].forEach(function(v){if(v>=0&&!seen[v]){seen[v]=1;c.push(v);}});}
+  var out=sample(c,k-1);out.push(n);
+  out.sort(function(a,b){return a-b;});
+  return out.map(function(v){return{node:h('span',{class:'num',text:String(v)}),ok:v===n,label:String(v)};});
+}
+function near(n){return[n-1,n+1,n-2,n+2,n+3];}
+function numQ(stage,prompt,show,n,done,cands){
+  lastN=n;
+  choiceQ(stage,{prompt:prompt,show:show,choices:numChoices(n,cands||near(n),4)},done);
+}
+function fresh(make){var v,i=0;do{v=make();}while(v.n===lastN&&++i<8);return v;}
+var COUNTQ={
+  count10:function(st,done){var t=pick(THINGS),v=fresh(function(){return{n:between(3,10)};});
+    numQ(st,'How many '+t[1]+'?',h('div',{class:'show'},[groupEl(rep(t[0],v.n))]),v.n,done);},
+  count20:function(st,done){var t=pick(THINGS),v=fresh(function(){return{n:between(11,20)};});
+    numQ(st,'How many '+t[1]+'?',h('div',{class:'show'},[groupEl(rep(t[0],v.n))]),v.n,done);},
+  kind:function(st,done,level){var ts=sample(THINGS,2),hi=level>=3?8:6,v=fresh(function(){return{n:between(2,hi),b:between(2,hi)};});
+    numQ(st,'How many '+ts[0][1]+'?',h('div',{class:'show'},[groupEl(shuffle(rep(ts[0][0],v.n).concat(rep(ts[1][0],v.b))))]),v.n,done,[v.b,v.n+v.b,v.n-1,v.n+1]);},
+  addPic:function(st,done){var t=pick(THINGS),v=fresh(function(){var a=between(1,5),b=between(1,5);return{a:a,b:b,n:a+b};});
+    numQ(st,'How many '+t[1]+' altogether?',h('div',{class:'show'},[groupEl(rep(t[0],v.a)),h('span',{class:'plus',text:'+'}),groupEl(rep(t[0],v.b))]),v.n,done);},
+  subPic:function(st,done){var t=pick(THINGS),v=fresh(function(){var a=between(4,10),b=between(1,a-1);return{a:a,b:b,n:a-b};});
+    numQ(st,v.a+' '+t[1]+'. Take away '+v.b+'. How many are left?',h('div',{class:'show'},[groupEl(rep(t[0],v.a),v.b)]),v.n,done,[v.a,v.b,v.n-1,v.n+1]);},
+  more:function(st,done){var ts=sample(THINGS,2),a=between(3,9),b;do{b=between(3,9);}while(b===a);
+    var more=rnd(2)===0,first=more?a>b:a<b;
+    choiceQ(st,{prompt:more?'Which group has more?':'Which group has fewer?',choices:[
+      {node:groupEl(rep(ts[0][0],a)),ok:first,wide:true,label:a+' '+ts[0][1]},
+      {node:groupEl(rep(ts[1][0],b)),ok:!first,wide:true,label:b+' '+ts[1][1]}]},done);},
+  diff:function(st,done){var ts=sample(THINGS,2),v=fresh(function(){var b=between(2,6),a=b+between(1,5);return{a:a,b:b,n:a-b};});
+    numQ(st,'How many more '+ts[0][1]+' than '+ts[1][1]+'?',h('div',{class:'show col'},[groupEl(rep(ts[0][0],v.a)),groupEl(rep(ts[1][0],v.b))]),v.n,done,[v.a,v.b,v.n+1,v.n-1]);},
+  seq:function(st,done,level){
+    var step=level<=2?1:(level===3?pick([1,-1,2]):(level===4?pick([2,5,10,-1]):pick([-2,3,-5,-10,4])));
+    var len=5,start=step>0?(Math.abs(step)===10?between(0,4)*10:(step===5?between(0,4)*5:between(1,10))):between(5,12)*Math.abs(step);
+    var hide=level>=4&&rnd(2)?between(1,3):len-1,vals=[],i;
+    for(i=0;i<len;i++)vals.push(start+i*step);
+    var row=h('div',{class:'nums'});
+    vals.forEach(function(v,k){row.appendChild(h('div',{class:k===hide?'q':'',text:k===hide?'?':String(v)}));});
+    var n=vals[hide],s=Math.abs(step);
+    numQ(st,'What number is missing?',h('div',{class:'show'},[row]),n,done,[n+s,n-s,n+1,n-1,n+2*s]);},
+  addNum:function(st,done){var v=fresh(function(){var a=between(3,12),b=between(2,20-a>9?9:20-a);return{a:a,b:b,n:a+b};});
+    numQ(st,'What is '+v.a+' add '+v.b+'?',h('div',{class:'eq',text:v.a+' + '+v.b+' = ?'}),v.n,done);},
+  subNum:function(st,done,level){var hi=level>=5?20:10,v=fresh(function(){var a=between(5,hi),b=between(2,Math.min(a-1,9));return{a:a,b:b,n:a-b};});
+    numQ(st,'What is '+v.a+' take away '+v.b+'?',h('div',{class:'eq',text:v.a+' − '+v.b+' = ?'}),v.n,done);},
+  missing:function(st,done){var v=fresh(function(){var a=between(2,9),n=between(2,9);return{a:a,n:n,t:a+n};});
+    numQ(st,'What number is missing?',h('div',{class:'eq',text:v.a+' + ? = '+v.t}),v.n,done,[v.t,v.a,v.n+1,v.n-1]);},
+  double:function(st,done){
+    var v;
+    if(rnd(2)){v=fresh(function(){var a=between(2,10);return{a:a,n:a*2};});
+      numQ(st,'What is double '+v.a+'?',h('div',{class:'eq',text:v.a+' + '+v.a+' = ?'}),v.n,done,[v.a,v.n+2,v.n-2,v.n+1]);}
+    else{v=fresh(function(){var n=between(2,10);return{a:n*2,n:n};});
+      numQ(st,'What is half of '+v.a+'?',h('div',{class:'eq',text:'? + ? = '+v.a}),v.n,done,[v.a,v.n+1,v.n-1,v.n+2]);}
+  }
+};
+var COUNTMIX={1:['count10'],2:['count20','kind','addPic','seq'],3:['kind','addPic','subPic','more','seq','seq'],
+  4:['addNum','subNum','seq','diff','subPic','seq'],5:['missing','subNum','seq','diff','double','addNum']};
+var countGame={id:'count',name:'Count it',c:'red',
+  rounds:function(){return 6;},
+  play:function(level,stage,done){COUNTQ[fromMix(COUNTMIX[level])](stage,done,level);}
+};
+
+/* ---------- 2. Letters ---------- */
+var FIRST=[['a','ant','🐜'],['a','apple','🍎'],['b','ball','⚽'],['b','bus','🚌'],['b','bell','🔔'],['c','cat','🐱'],['c','car','🚗'],['c','cow','🐮'],['d','dog','🐶'],['e','elephant','🐘'],['f','fish','🐟'],['f','frog','🐸'],['g','grapes','🍇'],['h','hat','🎩'],['h','hen','🐔'],['k','key','🔑'],['l','lion','🦁'],['m','moon','🌙'],['m','mouse','🐭'],['n','nut','🌰'],['o','octopus','🐙'],['p','pig','🐷'],['r','rain','🌧️'],['r','rocket','🚀'],['s','sun','☀️'],['s','star','⭐'],['t','tree','🌳'],['t','tiger','🐯'],['u','umbrella','☂️'],['v','van','🚐'],['w','web','🕸️']];
+var W3=[['cat','🐱'],['dog','🐶'],['pig','🐷'],['sun','☀️'],['bus','🚌'],['hat','🎩'],['hen','🐔'],['van','🚐'],['web','🕸️'],['nut','🌰'],['bug','🐛'],['ant','🐜'],['bee','🐝'],['cow','🐮'],['key','🔑'],['car','🚗'],['pan','🍳'],['pen','🖊️'],['box','📦'],['bed','🛏️'],['cup','☕'],['map','🗺️'],['rat','🐀'],['ram','🐏'],['eye','👁️'],['ear','👂'],['sea','🌊'],['bow','🎀'],['gem','💎'],['pot','🍯'],['bag','🎒'],['tie','👔'],['bin','🗑️'],['cab','🚕'],['jet','✈️']];
+var W4=[['frog','🐸'],['fish','🐟'],['star','⭐'],['moon','🌙'],['tree','🌳'],['bell','🔔'],['ball','⚽'],['lion','🦁'],['rain','🌧️'],['boat','⛵'],['book','📖'],['cake','🍰'],['door','🚪'],['bird','🐦'],['bear','🐻'],['hand','✋'],['nose','👃'],['ship','🚢'],['ring','💍'],['leaf','🍃'],['corn','🌽'],['pear','🍐']];
+var W5=[['apple','🍎'],['tiger','🐯'],['mouse','🐭'],['horse','🐴'],['sheep','🐑'],['train','🚂'],['snail','🐌'],['whale','🐳'],['pizza','🍕'],['bread','🍞'],['house','🏠'],['cloud','☁️'],['heart','❤️'],['lemon','🍋'],['robot','🤖'],['crown','👑'],['shirt','👕'],['snake','🐍'],['panda','🐼'],['camel','🐫']];
+W3=W3.concat([['owl','🦉'],['fox','🦊'],['bat','🦇'],['egg','🥚'],['pie','🥧'],['leg','🦵'],['arm','💪'],['ape','🦍'],['cap','🧢'],['tea','🍵'],['net','🥅'],['pin','📌'],['fog','🌫️'],['ice','🧊'],['dad','👨'],['mum','👩'],['boy','👦'],['sad','😢'],['red','🔴'],['run','🏃'],['hug','🤗'],['six','6️⃣'],['ten','🔟'],['two','2️⃣'],['one','1️⃣'],['tub','🛁'],['kid','🧒']]);
+W4=W4.concat([['duck','🦆'],['goat','🐐'],['crab','🦀'],['wolf','🐺'],['deer','🦌'],['lamb','🐑'],['snow','❄️'],['fire','🔥'],['milk','🥛'],['rice','🍚'],['soup','🍲'],['drum','🥁'],['bike','🚲'],['tent','⛺'],['sock','🧦'],['coat','🧥'],['shoe','👟'],['face','🙂'],['foot','🦶'],['king','🤴'],['girl','👧'],['baby','👶'],['rose','🌹'],['lock','🔒'],['gift','🎁'],['flag','🚩'],['kiwi','🥝'],['swan','🦢'],['bath','🛁'],['sofa','🛋️'],['home','🏡'],['wind','🌬️'],['swim','🏊'],['sing','🎤'],['tram','🚊'],['game','🎮'],['dice','🎲'],['nine','9️⃣'],['five','5️⃣'],['four','4️⃣'],['zero','0️⃣'],['cold','🥶'],['blue','🔵'],['bone','🦴'],['paws','🐾'],['taco','🌮'],['fork','🍴'],['bowl','🥣']]);
+W5=W5.concat([['zebra','🦓'],['koala','🐨'],['eagle','🦅'],['shark','🦈'],['llama','🦙'],['bunny','🐰'],['puppy','🐶'],['hippo','🦛'],['rhino','🦏'],['chick','🐤'],['beach','🏖️'],['storm','⛈️'],['earth','🌍'],['ocean','🌊'],['grape','🍇'],['melon','🍈'],['peach','🍑'],['mango','🥭'],['honey','🍯'],['candy','🍬'],['clock','🕐'],['phone','📱'],['plane','✈️'],['truck','🚚'],['dress','👗'],['glove','🧤'],['scarf','🧣'],['queen','👸'],['smile','😊'],['sleep','😴'],['teeth','🦷'],['mouth','👄'],['music','🎵'],['piano','🎹'],['ghost','👻'],['alien','👽'],['fairy','🧚'],['seven','7️⃣'],['three','3️⃣'],['eight','8️⃣'],['light','💡']]);
+var CVC=W3.filter(function(w){return'aeiou'.indexOf(w[0].charAt(1))>=0&&'aeiou'.indexOf(w[0].charAt(0))<0&&'aeiouwy'.indexOf(w[0].charAt(2))<0;});
+var ABC='abcdefghklmnoprstuvw'.split('');
+var lastWord='';
+function freshWord(list){var w,i=0;do{w=pick(list);}while(w[0]===lastWord&&++i<8);lastWord=w[0];return w;}
+function picEl(emoji,word){
+  var b=h('button',{class:'pic',type:'button','aria-label':'Hear the word',text:emoji});
+  b.addEventListener('click',function(){say(word,true);});
+  return h('div',{class:'show'},[b]);
+}
+function spellQ(stage,w,extra,done){
+  var word=w[0],letters=word.split(''),g=G,pos=0,five=letters.length+extra>5?' five':'';
+  setPrompt('What is this? Spell it.','What is this? Spell it. Tap the picture to hear the word.');
+  stage.appendChild(picEl(w[1],word));
+  var slotEls=letters.map(function(){return h('div',{class:'slot'});});
+  stage.appendChild(h('div',{class:'slots'+five},slotEls));
+  var tiles=letters.concat(sample(ABC.filter(function(x){return letters.indexOf(x)<0;}),extra));
+  do{tiles=shuffle(tiles);}while(tiles.slice(0,letters.length).join('')===word);
+  var row=h('div',{class:'choices'+five});
+  tiles.forEach(function(ch){
+    var b=h('button',{class:'block ltile',type:'button',text:ch});
+    b.addEventListener('click',function(){
+      if(G!==g||b.disabled||pos>=letters.length)return;
+      if(ch===letters[pos]){
+        slotEls[pos].textContent=ch;slotEls[pos].classList.add('filled');
+        b.disabled=true;b.classList.add('used');pos++;
+        if(pos===letters.length){sfx('good');say(word);done(1700);}else sfx('tick');
+      }else{
+        g.mistakes++;sfx('soft');
+        b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');
+      }
+    });
+    row.appendChild(b);
+  });
+  stage.appendChild(row);
+}
+var LETQ={
+  first:function(st,done){
+    var w,i=0;do{w=pick(FIRST);}while(w[1]===lastWord&&++i<8);lastWord=w[1];
+    var bad=w[0]==='c'?'k':(w[0]==='k'?'c':'');
+    var others=sample(ABC.filter(function(x){return x!==w[0]&&x!==bad;}),3);
+    choiceQ(st,{prompt:'What sound does this start with?',spoken:'What sound does '+w[1]+' start with?',show:picEl(w[2],w[1]),
+      choices:shuffle(others.concat([w[0]])).map(function(x){return{node:h('span',{class:'ltr',text:x}),ok:x===w[0],label:x};})},done);
+  },
+  middle:function(st,done){
+    var w=freshWord(CVC),v=w[0].charAt(1);
+    var others=sample('aeiou'.split('').filter(function(x){return x!==v;}),3);
+    choiceQ(st,{prompt:'What sound is in the middle?',spoken:'What sound is in the middle of '+w[0]+'?',show:picEl(w[1],w[0]),
+      choices:shuffle(others.concat([v])).map(function(x){return{node:h('span',{class:'ltr',text:x}),ok:x===v,label:x};})},done);
+  },
+  read:function(st,done,list){
+    var w=freshWord(list);
+    var same=list.filter(function(x){return x[0]!==w[0]&&x[0].charAt(0)===w[0].charAt(0);});
+    var rest=list.filter(function(x){return x[0]!==w[0]&&x[0].charAt(0)!==w[0].charAt(0);});
+    var others=shuffle(same).concat(shuffle(rest)).slice(0,3);
+    choiceQ(st,{prompt:'Which word matches the picture?',show:h('div',{class:'show'},[h('span',{class:'pic',text:w[1]})]),
+      choices:shuffle(others.concat([w])).map(function(x){return{node:h('span',{class:'wordtxt',text:x[0]}),ok:x[0]===w[0],wide:true,label:x[0]};})},done);
+  }
+};
+var lettersGame={id:'letters',name:'Letters',c:'blue',
+  rounds:function(level){return level===1?6:5;},
+  play:function(level,stage,done){
+    var t=fromMix({1:['first'],2:['build','build','middle'],3:['build','read','middle','build'],4:['build','read','build'],5:['build','read','build']}[level]);
+    if(t==='first')return LETQ.first(stage,done);
+    if(t==='middle')return LETQ.middle(stage,done);
+    var list=level===2?CVC:(level===3?(t==='read'?W3:W4):(level===4?W4:W5));
+    if(t==='read')return LETQ.read(stage,done,list);
+    spellQ(stage,freshWord(list),level===3?0:2,done);
+  }
+};
+
+/* ---------- 3. Shapes ---------- */
+var S1=['circle','square','triangle','rectangle','star','heart','oval','diamond'];
+var S2=S1.concat(['pentagon','hexagon','semicircle','crescent','cross','arrow']);
+var S3=S2.concat(['octagon','trapezium','parallelogram','kite']);
+var D3A=['cube','sphere','cone','cylinder'],D3B=D3A.concat(['cuboid','pyramid']);
+var ROT={triangle:[0,180,90,25],rectangle:[0,90],oval:[0,90,30],pentagon:[0,180],semicircle:[0,180,90],crescent:[0,180],arrow:[0,90,180,270],trapezium:[0,180],parallelogram:[0,90],kite:[0,180],hexagon:[0,30]};
+var BYSIDES={3:['triangle'],4:['square','rectangle','diamond','trapezium','parallelogram','kite'],5:['pentagon'],6:['hexagon'],8:['octagon']};
+function rotFor(name,level){return level>=2&&ROT[name]?pick(ROT[name]):0;}
+var lastShape='';
+function nameQ(st,done,pool,k,level){
+  var opts,target,i=0,cols=shuffle(COLS);
+  do{opts=sample(pool,k);target=pick(opts);}while(target===lastShape&&++i<8);
+  lastShape=target;
+  choiceQ(st,{prompt:'Tap the '+target,choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j%cols.length],rotFor(s,level)),ok:s===target,label:s};})},done);
+}
+function sidesSet(){
+  return sample([3,4,5,6,8],4).map(function(n){return{n:n,s:pick(BYSIDES[n])};});
+}
+var SHAPEQ={
+  n1:function(st,done,l){nameQ(st,done,S1,4,l);},
+  n2:function(st,done,l){nameQ(st,done,S2,4,l);},
+  n3:function(st,done,l){nameQ(st,done,S3,l>=4?6:4,l);},
+  d3a:function(st,done,l){nameQ(st,done,D3A,4,l);},
+  d3b:function(st,done,l){nameQ(st,done,D3B,l>=4?6:4,l);},
+  all:function(st,done,l){nameQ(st,done,S3.concat(D3B),6,l);},
+  both:function(st,done){
+    var ss=sample(S1,2),cs=sample(COLS,2),opts=[],t=rnd(4);
+    ss.forEach(function(s){cs.forEach(function(c){opts.push({s:s,c:c});});});
+    var target=opts[t];opts=shuffle(opts);
+    choiceQ(st,{prompt:'Tap the '+target.c+' '+target.s,choices:opts.map(function(o){return{node:shapeEl(o.s,o.c),ok:o===target,label:o.c+' '+o.s};})},done);
+  },
+  sides:function(st,done,l){
+    var set=sidesSet(),target=pick(set),cols=shuffle(COLS),word=l>=4&&rnd(2)?'corners':'sides';
+    choiceQ(st,{prompt:'Which shape has '+target.n+' '+word+'?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
+  },
+  most:function(st,done,l){
+    var set=sidesSet(),most=l<5||rnd(2)===0,cols=shuffle(COLS);
+    var target=set.reduce(function(a,b){return(most?b.n>a.n:b.n<a.n)?b:a;});
+    choiceQ(st,{prompt:most?'Which shape has the most sides?':'Which shape has the fewest sides?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
+  },
+  curvy:function(st,done){
+    var good=pick(['circle','oval']),cols=shuffle(COLS);
+    var opts=shuffle(sample(['square','triangle','rectangle','pentagon','hexagon','diamond','star','trapezium'],3).concat([good]));
+    choiceQ(st,{prompt:'Which shape has no corners?',choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j]),ok:s===good,label:s};})},done);
+  },
+  odd:function(st,done,l){
+    var pool=l>=4?S3:S2,pair=sample(pool,2),k=l>=4?6:4,cols=shuffle(COLS),opts=[];
+    for(var i=0;i<k-1;i++)opts.push({s:pair[0],odd:false});
+    opts.push({s:pair[1],odd:true});opts=shuffle(opts);
+    choiceQ(st,{prompt:'Which is the odd one out?',choices:opts.map(function(o,j){return{node:shapeEl(o.s,cols[j%cols.length],rotFor(o.s,l)),ok:o.odd,label:o.s};})},done);
+  }
+};
+var SHAPEMIX={1:['n1'],2:['n2','n2','both'],3:['n3','sides','odd','d3a','both','n3'],4:['n3','d3b','sides','odd','most','curvy'],5:['all','sides','most','odd','curvy','d3b']};
+var shapesGame={id:'shapes',name:'Shapes',c:'yellow',
+  rounds:function(){return 6;},
+  play:function(level,stage,done){SHAPEQ[fromMix(SHAPEMIX[level])](stage,done,level);}
+};
+
+/* ---------- 4. What's next? ---------- */
+var BITS=[['circle','red'],['square','blue'],['triangle','yellow'],['star','green'],['heart','pink'],['diamond','purple']];
+function itemEl(it){return shapeEl(it.s,it.c,it.r||0);}
+function itemKey(it){return it.s+'|'+it.c+'|'+(it.r||0);}
+function patQ(stage,items,hide,opts,done){
+  var ans=items[hide],gap=null,seq=h('div',{class:'seq'});
+  items.forEach(function(it,i){
+    if(i===hide){gap=h('div',{class:'cell gap',text:'?'});seq.appendChild(gap);}
+    else{var c=h('div',{class:'cell'});c.appendChild(itemEl(it));seq.appendChild(c);}
+  });
+  choiceQ(stage,{
+    prompt:hide===items.length-1?'What comes next?':'What is missing?',
+    show:h('div',{class:'show'},[seq]),
+    choices:shuffle(opts).map(function(o){return{node:itemEl(o),ok:itemKey(o)===itemKey(ans),label:o.c+' '+o.s};}),
+    after:function(){gap.textContent='';gap.classList.add('filled');gap.appendChild(itemEl(ans));}
+  },done);
+}
+var PATQ={
+  letters:function(st,done,level){
+    var T={1:['ABABAB','AABAAB','ABBABB','ABCABC'],2:['AABBAABB','ABCBABCB','ABCABCAB','AABAAB','ABCABC'],3:['ABCDABCD','AABCAABC','ABBCABBC','ABACABAC'],4:['ABCDABCD','ABCDDCBA','AABCAABC']};
+    var t=pick(T[Math.min(level,4)]),bits=shuffle(BITS),map={},used=[];
+    'ABCD'.split('').forEach(function(k,i){map[k]={s:bits[i][0],c:bits[i][1]};});
+    t.split('').forEach(function(k){if(used.indexOf(k)<0)used.push(k);});
+    if(used.length<3)used.push('C');
+    var hide=level>=2&&rnd(2)?t.length-1-between(1,3):t.length-1;
+    patQ(st,t.split('').map(function(k){return map[k];}),hide,used.map(function(k){return map[k];}),done);
+  },
+  two:function(st,done,level){
+    var flip=rnd(2),ps=flip?3:2,pc=flip?2:3;
+    var sh=sample(['circle','square','triangle','star','heart','diamond'],ps),co=sample(COLS,pc),items=[];
+    for(var i=0;i<8;i++)items.push({s:sh[i%ps],c:co[i%pc]});
+    var hide=level>=5||(level===4&&rnd(2))?between(3,6):7,a=items[hide];
+    var os=sh[(sh.indexOf(a.s)+1)%ps],oc=co[(co.indexOf(a.c)+1)%pc];
+    patQ(st,items,hide,[a,{s:a.s,c:oc},{s:os,c:a.c},{s:os,c:oc}],done);
+  },
+  turn:function(st,done,level){
+    var step=level>=5?pick([45,-45,-90,135]):pick([90,-90]),start=rnd(4)*90,c=pick(COLS),items=[];
+    function norm(r){return((r%360)+360)%360;}
+    for(var i=0;i<6;i++)items.push({s:'arrow',c:c,r:norm(start+i*step)});
+    var hide=level>=5&&rnd(2)?between(2,4):5,a=items[hide];
+    var offs=Math.abs(step)===90?[90,180,270]:[45,-45,180];
+    patQ(st,items,hide,[a].concat(offs.map(function(o){return{s:'arrow',c:c,r:norm(a.r+o)};})),done);
+  }
+};
+var PATMIX={1:['letters'],2:['letters'],3:['letters','letters','two'],4:['two','turn','letters'],5:['two','turn','two']};
+var nextGame={id:'next',name:"What's next?",c:'green',
+  rounds:function(){return 6;},
+  play:function(level,stage,done){PATQ[fromMix(PATMIX[level])](stage,done,level);}
+};
+
+/* ---------- 5. Pairs ---------- */
+var FACES=['🐱','🐶','🐸','🐷','🐮','🐔','🐟','🐝','🍎','🍌','🍇','⭐','🌙','🚗','🚌','🚀','⚽','🔑','🔔','🌳'];
+function pairDeck(level){
+  var d=[];
+  if(level<=3){sample(FACES,[0,6,8,12][level]).forEach(function(f){d.push({k:f,t:f,z:.56},{k:f,t:f,z:.56});});}
+  else if(level===4){sample('abdeghmnqrt'.split(''),10).forEach(function(l){d.push({k:l,t:l,z:.6},{k:l,t:l.toUpperCase(),z:.6});});}
+  else{sample([3,4,5,6,7,8,9,10,11,12],10).forEach(function(n){var a=between(1,n-1);d.push({k:n,t:String(n),z:.5},{k:n,t:a+'+'+(n-a),z:.3});});}
+  return shuffle(d);
+}
+var pairsGame={id:'pairs',name:'Pairs',c:'purple',
+  rounds:function(){return 1;},
+  play:function(level,stage,done){
+    var g=G,deck=pairDeck(level),n=deck.length,pairs=n/2;
+    var wide=window.innerWidth>window.innerHeight,cols=n===12?(wide?4:3):(wide?n/4:4),rows=n/cols;
+    var cs=Math.floor(Math.min((window.innerWidth-32-(cols-1)*12)/cols,(window.innerHeight-200-(rows-1)*12)/rows-6,150));
+    setPrompt(level===4?'Match big letters to small letters':(level===5?'Match each sum to its answer':'Find the pairs'));
+    var open=[],found=0,miss=0,busy=false;
+    var grid=h('div',{class:'cards',style:'grid-template-columns:repeat('+cols+',auto)'});
+    deck.forEach(function(c){
+      var b=h('button',{class:'block card',type:'button','aria-label':'Card',style:'width:'+cs+'px;height:'+cs+'px;font-size:'+Math.round(cs*c.z)+'px'},[h('span',{text:c.t})]);
+      b.addEventListener('click',function(){
+        if(G!==g||busy||b.classList.contains('up'))return;
+        b.classList.add('up');sfx('tick');open.push({b:b,k:c.k});
+        if(open.length<2)return;
+        var x=open[0],y=open[1];open=[];
+        if(x.k===y.k){
+          x.b.classList.add('gone');y.b.classList.add('gone');x.b.disabled=y.b.disabled=true;
+          found++;sfx('good');
+          if(found===pairs){if(miss>pairs*2)g.mistakes+=2;done(1100);}
+        }else{
+          miss++;busy=true;
+          setTimeout(function(){x.b.classList.remove('up');y.b.classList.remove('up');busy=false;},1000);
+        }
+      });
+      grid.appendChild(b);
+    });
+    stage.appendChild(grid);
+  }
+};
+
+/* ---------- 6. Copy it ---------- */
+var COPYCFG={1:{n:3,p:1,lo:4,hi:5},2:{n:4,p:1,lo:6,hi:8},3:{n:4,p:2,lo:7,hi:9},4:{n:5,p:3,lo:10,hi:13},5:{n:5,p:2,lo:9,hi:12,mirror:true}};
+var copyGame={id:'copy',name:'Copy it',c:'pink',
+  rounds:function(){return 3;},
+  play:function(level,stage,done){
+    var cfg=COPYCFG[level],n=cfg.n,g=G,paints=['blue','red','yellow'].slice(0,cfg.p),sel=1;
+    var count=between(cfg.lo,cfg.hi),shown=[],want=[],mine=[],i,taps=0,locked=false;
+    for(i=0;i<n*n;i++){shown.push(0);mine.push(0);}
+    sample(shown.map(function(_,k){return k;}),count).forEach(function(k){shown[k]=1+rnd(paints.length);});
+    for(i=0;i<n*n;i++)want.push(cfg.mirror?shown[Math.floor(i/n)*n+(n-1-i%n)]:shown[i]);
+    if(cfg.mirror&&want.join()===shown.join())want[0]=shown[n-1]=shown[n-1]?0:1,want[n-1]=shown[0];
+    setPrompt(cfg.mirror?'Make the mirror picture':'Copy the picture');
+    var cell=Math.floor(Math.min((window.innerWidth-110)/(2*n)-5,(window.innerHeight-360)/n-5,74));
+    var cst='width:'+cell+'px;height:'+cell+'px;';
+    function fill(v){return v?COL[paints[v-1]]:'';}
+    var tgt=h('div',{class:'grid',style:'grid-template-columns:repeat('+n+',auto)'});
+    shown.forEach(function(v){tgt.appendChild(h('div',{style:cst+(v?'background:'+fill(v):'')}));});
+    var me=h('div',{class:'grid',style:'grid-template-columns:repeat('+n+',auto)'});
+    mine.forEach(function(_,k){
+      var b=h('button',{type:'button','aria-label':'Square '+(k+1),style:cst});
+      b.addEventListener('click',function(){
+        if(G!==g||locked)return;
+        mine[k]=mine[k]===sel?0:sel;b.style.background=fill(mine[k]);taps++;sfx('tick');
+        if(mine.join()===want.join()){
+          locked=true;me.classList.add('done');sfx('good');
+          if(taps>count*2)g.mistakes++;
+          done(1300);
+        }
+      });
+      me.appendChild(b);
+    });
+    stage.appendChild(h('div',{class:'copy'+(cfg.mirror?' mirror':'')},[
+      h('div',{class:'gridbox'},[tgt,h('span',{class:'cap',text:'Look'})]),
+      cfg.mirror?h('div',{class:'mline'}):null,
+      h('div',{class:'gridbox'},[me,h('span',{class:'cap',text:'Your turn'})])
+    ]));
+    if(paints.length>1){
+      var row=h('div',{class:'paints'});
+      paints.forEach(function(p,idx){
+        var b=h('button',{class:'paint'+(idx===0?' on':''),type:'button','aria-label':p+' paint',style:'background:'+COL[p]});
+        b.addEventListener('click',function(){
+          sel=idx+1;
+          Array.prototype.forEach.call(row.children,function(x){x.classList.remove('on');});
+          b.classList.add('on');
+        });
+        row.appendChild(b);
+      });
+      stage.appendChild(row);
+    }
+  }
+};
+
+/* ---------- 7. Tunes ---------- */
+var BARCOL=['#ef5b4c','#f08a3c','#f6b93b','#3fae6a','#22a6a1','#3d8fe0','#8a63d2','#ee6fa0'];
+var TUNES=[['Hot Cross Buns',[2,1,0,2,1,0,0,0,0,0,1,1,1,1,2,1,0]],
+  ['Mary Had a Little Lamb',[2,1,0,1,2,2,2,1,1,1,2,4,4]],
+  ['Row, Row, Row Your Boat',[0,0,0,1,2,2,1,2,3,4]],
+  ['Twinkle Twinkle Little Star',[0,0,4,4,5,5,4,3,3,2,2,1,1,0]],
+  ['Frère Jacques',[0,1,2,0,0,1,2,0,2,3,4,2,3,4]],
+  ['London Bridge',[4,5,4,3,2,3,4,1,2,3,2,3,4]],
+  ['Jingle Bells',[2,2,2,2,2,2,2,4,0,1,2]],
+  ['Ode to Joy',[2,2,3,4,4,3,2,1,0,0,1,2,2,1,1]]];
+function xylo(active,onTap){
+  var el=h('div',{class:'xylo'}),bars=[];
+  NOTES.forEach(function(_,i){
+    var b=h('button',{class:'xbar',type:'button','aria-label':'Note '+(i+1),style:'background:'+BARCOL[i]+';height:'+(100-i*6)+'%'});
+    if(i>=active)b.disabled=true;
+    b.addEventListener('click',function(){onTap(i);});
+    bars.push(b);el.appendChild(b);
+  });
+  return{el:el,bars:bars,flash:function(i){var b=bars[i];b.classList.add('lit');setTimeout(function(){b.classList.remove('lit');},360);}};
+}
+function hearAgain(fn){
+  var b=h('button',{class:'block go alt',type:'button',text:'Hear it again'});
+  b.addEventListener('click',fn);
+  return b;
+}
+var MUSQ={
+  follow:function(st,done,level){
+    var g=G,pool=level<=2?TUNES.slice(0,4):TUNES,P=S.prog||(S.prog={}),k=P.tune=(P.tune||0)+1,tune=pool[k%pool.length],seq=tune[1],pos=0,x;
+    setPrompt('Tap the glowing bar to play a tune');
+    x=xylo(8,function(i){
+      if(G!==g||pos>=seq.length)return;
+      ping(i);x.flash(i);
+      if(i!==seq[pos])return;
+      x.bars[i].classList.remove('next');pos++;
+      if(pos===seq.length){setPrompt('You played '+tune[0]+'!');done(2600);}
+      else setTimeout(function(){if(G===g)x.bars[seq[pos]].classList.add('next');},120);
+    });
+    x.bars[seq[0]].classList.add('next');
+    st.appendChild(x.el);
+  },
+  copy:function(st,done,level,len,nb){
+    var g=G,seq=[],pos=0,busy=true,msg=note(),x,i;
+    for(i=0;i<len;i++){var n;do{n=rnd(nb);}while(i&&n===seq[i-1]);seq.push(n);}
+    function play(){
+      busy=true;pos=0;msg.textContent='Listen...';
+      seq.forEach(function(n,k){setTimeout(function(){if(G===g){ping(n);x.flash(n);}},k*620);});
+      setTimeout(function(){if(G===g){busy=false;msg.textContent='Your turn';}},seq.length*620);
+    }
+    setPrompt('Listen, then copy the tune');
+    x=xylo(nb,function(i){
+      if(G!==g||busy||pos>=seq.length)return;
+      ping(i);x.flash(i);
+      if(i===seq[pos]){
+        pos++;
+        if(pos===seq.length){msg.textContent='You got it!';busy=true;done(1300);}
+      }else{
+        g.mistakes++;busy=true;msg.textContent='Not quite. Listen again.';
+        setTimeout(function(){if(G===g)play();},1100);
+      }
+    });
+    st.appendChild(x.el);st.appendChild(msg);
+    st.appendChild(hearAgain(function(){if(G===g&&!busy)play();}));
+    setTimeout(function(){if(G===g)play();},2200);
+  },
+  hilo:function(st,done,level){
+    var g=G,gap=level<=3?4:(level===4?2:1),a,b,busy=true,msg=note(),locked=false;
+    do{a=rnd(8);b=rnd(8);}while(Math.abs(a-b)<gap||(level>=5&&Math.abs(a-b)>2));
+    var higher=level<4||rnd(2)===0,ans=(higher?a>b:a<b)?0:1;
+    setPrompt('Which note is '+(higher?'higher':'lower')+', the first or the second?');
+    var btns=[0,1].map(function(k){
+      var el=h('button',{class:'block choice',type:'button','aria-label':k?'Second note':'First note'},[h('span',{class:'num',text:String(k+1)})]);
+      el.addEventListener('click',function(){
+        if(G!==g||busy||locked||el.disabled)return;
+        if(k===ans){locked=true;el.classList.add('right');sfx('good');done(1100);}
+        else{g.mistakes++;el.disabled=true;el.classList.add('nope');sfx('soft');}
+      });
+      return el;
+    });
+    function play(){
+      busy=true;msg.textContent='Listen...';
+      [a,b].forEach(function(n,k){setTimeout(function(){
+        if(G!==g)return;
+        ping(n,true);btns[k].classList.add('lit');
+        setTimeout(function(){btns[k].classList.remove('lit');},700);
+      },k*1100);});
+      setTimeout(function(){if(G===g){busy=false;msg.textContent='Tap 1 or 2';}},2000);
+    }
+    st.appendChild(h('div',{class:'choices'},btns));st.appendChild(msg);
+    st.appendChild(hearAgain(function(){if(G===g&&!busy&&!locked)play();}));
+    setTimeout(function(){if(G===g)play();},3200);
+  }
+};
+var MUSPLAN={1:[['follow'],['copy',2,3],['copy',2,3],['copy',3,3]],
+  2:[['follow'],['copy',3,5],['copy',3,5],['copy',4,5]],
+  3:[['follow'],['copy',4,8],['hilo'],['copy',4,8],['hilo']],
+  4:[['copy',5,8],['hilo'],['copy',5,8],['hilo'],['follow']],
+  5:[['copy',6,8],['hilo'],['copy',6,8],['hilo'],['copy',7,8]]};
+var musicGame={id:'music',name:'Tunes',c:'teal',
+  rounds:function(level){return MUSPLAN[level].length;},
+  play:function(level,stage,done){var p=MUSPLAN[level][G.i];MUSQ[p[0]](stage,done,level,p[1],p[2]);}
+};
+
+/* ---------- 8. My dog ---------- */
+var COATS=[['#e0a458','#b97a2f','#f8e6c4'],['#8a5a3c','#5f3b25','#ecd5b8'],['#f1ede4','#b9b1a2','#ffffff'],['#4a4d5a','#2b2d36','#c9ccd6']];
+var HEART='M50 88 C12 60 6 32 26 20 C38 13 48 20 50 31 C52 20 62 13 74 20 C94 32 88 60 50 88Z';
+var STAR4='M0 -13 L3 -3 L13 0 L3 3 L0 13 L-3 3 L-13 0 L-3 -3Z';
+function dogSvg(k){
+  var c=COATS[k]||COATS[0],INK='#2b2b33';
+  return '<svg viewBox="0 0 300 300" aria-hidden="true" style="--coat:'+c[0]+';--coat-d:'+c[1]+';--coat-l:'+c[2]+'">'+
+  '<g class="x bedx"><ellipse cx="150" cy="258" rx="140" ry="36" fill="#8a63d2"/><ellipse cx="150" cy="252" rx="114" ry="23" fill="#cdbcf0"/></g>'+
+  '<ellipse cx="150" cy="273" rx="92" ry="9" fill="rgba(31,42,68,.12)"/>'+
+  '<path class="tail" d="M196 236 C238 232 256 204 248 172" fill="none" stroke="var(--coat-d)" stroke-width="20" stroke-linecap="round"/>'+
+  '<circle cx="98" cy="242" r="30" fill="var(--coat-d)"/><circle cx="202" cy="242" r="30" fill="var(--coat-d)"/>'+
+  '<ellipse cx="150" cy="212" rx="62" ry="60" fill="var(--coat)"/>'+
+  '<ellipse cx="150" cy="226" rx="36" ry="42" fill="var(--coat-l)"/>'+
+  '<rect x="121" y="196" width="26" height="70" rx="13" fill="var(--coat)"/><rect x="153" y="196" width="26" height="70" rx="13" fill="var(--coat)"/>'+
+  '<ellipse cx="134" cy="266" rx="17" ry="10" fill="var(--coat-l)"/><ellipse cx="166" cy="266" rx="17" ry="10" fill="var(--coat-l)"/>'+
+  '<ellipse cx="92" cy="266" rx="20" ry="10" fill="var(--coat-l)"/><ellipse cx="208" cy="266" rx="20" ry="10" fill="var(--coat-l)"/>'+
+  '<g class="x rumble" fill="none" stroke="#5d6b85" stroke-width="4" stroke-linecap="round"><path d="M30 206 q7 -8 14 0 t14 0"/><path d="M242 206 q7 -8 14 0 t14 0"/><path d="M36 226 q6 -7 12 0 t12 0"/><path d="M240 226 q6 -7 12 0 t12 0"/></g>'+
+  '<path d="M106 156 Q150 184 194 156 L194 170 Q150 198 106 170Z" fill="#ef5b4c"/><circle cx="150" cy="191" r="9" fill="#f6b93b" stroke="#c28a14" stroke-width="2"/>'+
+  '<g class="head">'+
+    '<path d="M96 62 C58 60 44 118 62 152 C74 166 98 146 104 108Z" fill="var(--coat-d)"/>'+
+    '<path d="M204 62 C242 60 256 118 238 152 C226 166 202 146 196 108Z" fill="var(--coat-d)"/>'+
+    '<ellipse cx="150" cy="104" rx="66" ry="60" fill="var(--coat)"/>'+
+    '<ellipse cx="180" cy="90" rx="24" ry="27" fill="var(--coat-d)" opacity=".5"/>'+
+    '<ellipse cx="150" cy="130" rx="38" ry="29" fill="var(--coat-l)"/>'+
+    '<path class="x tongue" d="M138 140 Q150 174 162 140Z" fill="#f2879b" stroke="#c9556d" stroke-width="2"/>'+
+    '<path d="M150 122 V134 M150 134 Q138 146 124 138 M150 134 Q162 146 176 138" fill="none" stroke="'+INK+'" stroke-width="4" stroke-linecap="round"/>'+
+    '<ellipse cx="150" cy="115" rx="14" ry="10" fill="'+INK+'"/><ellipse cx="146" cy="112" rx="4" ry="2.5" fill="#fff" opacity=".7"/>'+
+    '<g class="eye"><ellipse cx="124" cy="92" rx="9" ry="11" fill="'+INK+'"/><circle cx="127" cy="88" r="3.3" fill="#fff"/></g>'+
+    '<g class="eye"><ellipse cx="176" cy="92" rx="9" ry="11" fill="'+INK+'"/><circle cx="179" cy="88" r="3.3" fill="#fff"/></g>'+
+    '<g class="x lids" fill="none" stroke="'+INK+'" stroke-width="4.5" stroke-linecap="round"><path d="M114 90 Q124 100 134 90"/><path d="M166 90 Q176 100 186 90"/></g>'+
+    '<g class="x smile" fill="none" stroke="'+INK+'" stroke-width="4.5" stroke-linecap="round"><path d="M114 96 Q124 84 134 96"/><path d="M166 96 Q176 84 186 96"/></g>'+
+    '<g class="x brows" fill="none" stroke="'+INK+'" stroke-width="4" stroke-linecap="round"><path d="M110 76 L132 68"/><path d="M190 76 L168 68"/></g>'+
+    '<g class="x leadm"><path d="M126 140 C96 226 204 226 174 140" fill="none" stroke="#22a6a1" stroke-width="10" stroke-linecap="round"/><rect x="139" y="196" width="22" height="14" rx="4" fill="#9aa7b8" stroke="#5d6b85" stroke-width="2"/></g>'+
+  '</g>'+
+  '<g class="x tufts"><g fill="none" stroke="var(--coat-d)" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"><path d="M126 50 l8 -16 l6 13 l8 -18 l6 15 l8 -13 l6 13"/><path d="M86 196 l-14 6 l13 6 l-14 8 l13 7"/><path d="M214 196 l14 6 l-13 6 l14 8 l-13 7"/></g>'+
+    '<ellipse cx="118" cy="58" rx="10" ry="4.5" fill="#3fae6a" transform="rotate(-30 118 58)"/><ellipse cx="198" cy="216" rx="10" ry="4.5" fill="#3fae6a" transform="rotate(40 198 216)"/><ellipse cx="184" cy="52" rx="9" ry="4" fill="#3fae6a" transform="rotate(25 184 52)"/></g>'+
+  '<g class="x mud" fill="#7a4a2a"><ellipse cx="118" cy="208" rx="16" ry="11"/><circle cx="186" cy="232" r="10"/><circle cx="172" cy="202" r="6"/><ellipse cx="134" cy="262" rx="13" ry="7"/><ellipse cx="196" cy="66" rx="14" ry="9"/><circle cx="112" cy="120" r="7"/><circle cx="166" cy="262" r="6"/></g>'+
+  '<g class="x drops" fill="#6db7ee"><path d="M82 92 q-8 13 0 18 q8 -5 0 -18Z"/><path d="M222 80 q-8 13 0 18 q8 -5 0 -18Z"/></g>'+
+  '<g class="x zzz" fill="#5d6b85" font-family="Fredoka,Trebuchet MS,sans-serif" font-weight="600"><text x="222" y="62" font-size="34">z</text><text x="246" y="38" font-size="26">z</text><text x="264" y="20" font-size="20">z</text></g>'+
+  '<g class="x hearts" fill="#ef5b4c"><path transform="translate(22 26) scale(.36)" d="'+HEART+'"/><path transform="translate(236 40) scale(.3)" d="'+HEART+'"/><path transform="translate(218 -6) scale(.22)" d="'+HEART+'"/></g>'+
+  '<g class="x woof"><text x="-6" y="46" font-size="30" font-family="Fredoka,Trebuchet MS,sans-serif" font-weight="600" fill="#1f2a44" transform="rotate(-12 -6 46)">Woof!</text></g>'+
+  '<g class="x bubbles" fill="#fff" stroke="#8cc8ee" stroke-width="2.5" opacity=".94"><circle cx="100" cy="190" r="20"/><circle cx="132" cy="170" r="24"/><circle cx="170" cy="176" r="22"/><circle cx="200" cy="196" r="18"/><circle cx="116" cy="222" r="22"/><circle cx="152" cy="208" r="26"/><circle cx="188" cy="226" r="22"/><circle cx="140" cy="244" r="20"/><circle cx="92" cy="58" r="14"/><circle cx="208" cy="66" r="12"/><circle cx="150" cy="40" r="16"/></g>'+
+  '<g class="x sparkle" fill="#f6b93b"><path transform="translate(52 96)" d="'+STAR4+'"/><path transform="translate(250 130) scale(.8)" d="'+STAR4+'"/><path transform="translate(232 34) scale(1.2)" d="'+STAR4+'"/></g>'+
+  '</svg>';
+}
+function isvg(inner){return'<svg viewBox="0 0 100 100" aria-hidden="true">'+inner+'</svg>';}
+var BOWL=function(col,inner,top,mark){return'<path d="M10 50 H90 L80 86 H20Z" fill="'+col+'"/><ellipse cx="50" cy="50" rx="40" ry="10" fill="'+inner+'"/>'+top+mark;};
+var BONE='<g fill="#fff"><rect x="40" y="65" width="20" height="6" rx="3"/><circle cx="40" cy="65" r="4"/><circle cx="40" cy="71" r="4"/><circle cx="60" cy="65" r="4"/><circle cx="60" cy="71" r="4"/></g>';
+var DROP='<path d="M50 58 C42 69 43 79 50 79 C57 79 58 69 50 58Z" fill="#fff"/>';
+var KIBBLE='<g fill="#a9713f" stroke="#7a4a2a" stroke-width="1.5"><circle cx="32" cy="45" r="8"/><circle cx="50" cy="40" r="9"/><circle cx="68" cy="45" r="8"/><circle cx="41" cy="50" r="7"/><circle cx="59" cy="50" r="7"/></g>';
+var ART={
+  food:isvg(BOWL('#ef5b4c','#8a5a3c',KIBBLE,BONE)),
+  foodEmpty:isvg(BOWL('#ef5b4c','#b93c30','',BONE)),
+  water:isvg(BOWL('#3d8fe0','#bfe3fb','<path d="M22 50 q7 -5 14 0 t14 0 t14 0 t14 0" fill="none" stroke="#fff" stroke-width="3"/>',DROP)),
+  waterEmpty:isvg(BOWL('#3d8fe0','#2867ab','',DROP)),
+  ball:isvg('<circle cx="50" cy="50" r="38" fill="#c7dc3a" stroke="#8fa31c" stroke-width="3"/><path d="M17 34 Q50 54 83 34 M17 66 Q50 46 83 66" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>'),
+  brush:isvg('<g transform="rotate(-20 50 50)"><rect x="12" y="28" width="76" height="24" rx="12" fill="#8a63d2"/><rect x="18" y="52" width="64" height="8" fill="#6243a3"/><g stroke="#5d6b85" stroke-width="4" stroke-linecap="round"><path d="M24 60 V78 M34 60 V80 M44 60 V78 M54 60 V80 M64 60 V78 M74 60 V80"/></g></g>'),
+  bath:isvg('<g fill="#dff3ff" stroke="#8cc8ee" stroke-width="2.5"><circle cx="30" cy="38" r="10"/><circle cx="48" cy="30" r="13"/><circle cx="66" cy="38" r="10"/><circle cx="78" cy="30" r="6"/></g><path d="M8 46 H92 V56 Q92 84 66 84 H34 Q8 84 8 56Z" fill="#fff" stroke="#9aa7b8" stroke-width="3"/><path d="M28 84 v8 M72 84 v8" stroke="#9aa7b8" stroke-width="5" stroke-linecap="round"/>'),
+  lead:isvg('<path d="M30 16 C6 34 14 74 44 66 C72 58 64 28 46 40 C34 48 44 62 56 70 L74 82" fill="none" stroke="#22a6a1" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/><rect x="70" y="76" width="20" height="13" rx="4" fill="#9aa7b8" transform="rotate(35 80 82)"/>'),
+  bed:isvg('<ellipse cx="50" cy="62" rx="44" ry="26" fill="#8a63d2"/><ellipse cx="50" cy="57" rx="32" ry="15" fill="#cdbcf0"/><g fill="#5d6b85" font-family="Fredoka,sans-serif" font-weight="600"><text x="62" y="30" font-size="20">z</text><text x="76" y="18" font-size="14">z</text></g>'),
+  bag:isvg('<path d="M40 34 Q50 10 60 34" fill="none" stroke="#2a7f4a" stroke-width="6" stroke-linecap="round"/><path d="M28 34 H72 L80 88 H20Z" fill="#3fae6a"/><g fill="#fff"><ellipse cx="50" cy="66" rx="10" ry="8"/><circle cx="36" cy="54" r="4.5"/><circle cx="46" cy="48" r="4.5"/><circle cx="56" cy="48" r="4.5"/><circle cx="65" cy="54" r="4.5"/></g>'),
+  poop:isvg('<g fill="#7a4a2a"><ellipse cx="50" cy="80" rx="30" ry="11"/><ellipse cx="50" cy="66" rx="21" ry="10"/><ellipse cx="50" cy="54" rx="13" ry="8"/><path d="M44 50 Q52 36 58 50Z"/></g><g fill="none" stroke="#5d6b85" stroke-width="3" stroke-linecap="round"><path d="M22 44 q5 -7 0 -14 M80 46 q5 -7 0 -14"/></g>'),
+  scoop:isvg('<path d="M14 40 H58 L52 78 H20Z" fill="#f6b93b" stroke="#c28a14" stroke-width="3"/><rect x="56" y="44" width="34" height="11" rx="5.5" fill="#c28a14"/><g fill="#a9713f"><circle cx="28" cy="38" r="7"/><circle cx="40" cy="35" r="7"/><circle cx="50" cy="39" r="6"/></g>')
+};
+var NEED={
+  food:{cue:'hungry',tell:' is hungry',done:'Yum! All full.',prop:'foodEmpty',after:'food'},
+  water:{cue:'thirsty',tell:' is thirsty',done:'Slurp! That is better.',prop:'waterEmpty',after:'water'},
+  ball:{cue:'play',tell:' wants to play',done:'Fetch! Good catch.',after:'ball'},
+  brush:{cue:'scruffy',tell:' has tangled fur',done:'So smooth now.'},
+  bath:{cue:'dirty',tell:' is all muddy',done:'Squeaky clean!'},
+  lead:{cue:'walk',tell:' wants to go for a walk',done:'What a lovely walk.'},
+  bag:{cue:'poop',tell:' did a poo on the walk',done:'All tidy. Thank you!',prop:'poop'},
+  bed:{cue:'sleepy',tell:' is sleepy',done:'Night night.'}
+};
+var ALLTOOLS=['food','water','ball','brush','bath','lead','bag','bed'];
+function dogPlan(level){
+  var seq;
+  if(level===1)seq=shuffle(['food','water','ball']);
+  else if(level===2)seq=sample(['food','water','ball','brush','bath','lead'],4);
+  else{
+    var o=shuffle(['food','water','ball','brush']);
+    seq=o.slice(0,2).concat(['lead','bag'],level>=4?['bath']:[],o.slice(2,3));
+  }
+  seq.push('bed');
+  return seq;
+}
+function nameDog(then){
+  screen='game';G={def:dogGame,i:0,total:0,mistakes:0};
+  buildShell();
+  var g=G,name='',coat=(S.dog&&S.dog.coat)||0;
+  setPrompt('Choose your dog and give it a name');
+  var dogBox=h('div',{class:'dog',html:dogSvg(coat)});
+  var scene=h('div',{class:'scene small'},[h('div',{class:'floor'}),dogBox]);
+  var line=h('div',{class:'nameline'}),coats=h('div',{class:'coats'}),keys=h('div',{class:'keys'});
+  COATS.forEach(function(c,i){
+    var b=h('button',{class:'coat'+(i===coat?' on':''),type:'button','aria-label':'Coat '+(i+1),style:'background:'+c[0]});
+    b.addEventListener('click',function(){
+      coat=i;dogBox.innerHTML=dogSvg(i);sfx('tick');
+      Array.prototype.forEach.call(coats.children,function(x){x.classList.remove('on');});b.classList.add('on');
+    });
+    coats.appendChild(b);
+  });
+  function paint(){line.textContent=name?name.charAt(0).toUpperCase()+name.slice(1):'';}
+  'abcdefghijklmnopqrstuvwxyz'.split('').forEach(function(l){
+    var b=h('button',{class:'key',type:'button',text:l});
+    b.addEventListener('click',function(){if(name.length<10){name+=l;sfx('tick');paint();}});
+    keys.appendChild(b);
+  });
+  var msg=note();
+  var acts=actKeys(function(){name=name.slice(0,-1);paint();},function(){
+    if(G!==g)return;
+    if(name.length<2){msg.textContent='Tap the letters to spell a name.';return;}
+    S.dog={name:name.charAt(0).toUpperCase()+name.slice(1),coat:coat};save();then();
+  });
+  [scene,coats,line,msg,keys,acts].forEach(function(e){stageEl.appendChild(e);});
+}
+function startDog(){
+  if(limitReached())return allDone();
+  if(!S.dog)return nameDog(startDog);
+  screen='game';
+  var level=levelOf('dog'),seq=dogPlan(level),name=S.dog.name;
+  G={def:dogGame,level:level,i:0,total:seq.length,mistakes:0};
+  buildShell();
+  var g=G,stage=stageEl;
+  var dogBox=h('div',{class:'dog',html:dogSvg(S.dog.coat)}),prop=h('div',{class:'prop'}),bubble=h('div',{class:'bubble',style:'display:none'});
+  var scene=h('div',{class:'scene'},[h('div',{class:'win'}),h('div',{class:'floor'}),prop,dogBox,bubble]);
+  var msg=note(),tray=h('div',{class:'tray'}),outside=false;
+  stage.appendChild(scene);stage.appendChild(msg);stage.appendChild(tray);
+  function look(cls,propArt,propCls){
+    dogBox.className='dog '+cls;
+    prop.className='prop'+(propCls?' '+propCls:'');prop.innerHTML=propArt?ART[propArt]:'';
+    scene.className='scene'+(outside?' out':'')+(/sleepy|asleep/.test(cls)?' night':'');
+  }
+  function toolButtons(list,onPick){
+    tray.innerHTML='';tray.style.gridTemplateColumns='repeat('+(list.length<=4?list.length:(list.length===5?3:4))+',auto)';
+    list.forEach(function(t){
+      var b=h('button',{class:'block tool',type:'button','aria-label':t,html:ART[t]});
+      b.setAttribute('data-t',t);
+      b.addEventListener('click',function(){onPick(t,b);});
+      tray.appendChild(b);
+    });
+  }
+  function act(need){
+    var N=NEED[need];
+    tray.innerHTML='';bubble.style.display='none';
+    if(need==='lead')outside=true;
+    if(need==='bath'||need==='bed')outside=false;
+    if(need==='bed')look('asleep');
+    else look('happy a-'+need,N.after,need==='ball'?'r bounce':'');
+    msg.textContent=N.done;say(N.done);sfx('good');
+    g.i++;drawDots();
+    setTimeout(function(){if(G!==g)return;if(g.i>=seq.length)finish();else step();},2600);
+  }
+  function scoops(){
+    var a=level>=5?between(2,4):between(2,5),b=level>=5?between(1,4):0,n=a+b,count=0;
+    var kib=h('div',{class:'kib'});
+    setPrompt(name+' needs '+(b?a+' add '+b:n)+' scoops of food. Tap the scoop.');
+    tray.innerHTML='';tray.style.gridTemplateColumns='auto';
+    var sc=h('button',{class:'block tool',type:'button','aria-label':'Add one scoop',html:ART.scoop});
+    sc.addEventListener('click',function(){if(G!==g||count>=12)return;count++;kib.appendChild(h('i'));sfx('tick');});
+    var acts=actKeys(function(){count=0;kib.innerHTML='';},function(){
+      if(G!==g)return;
+      if(count===n){msg.textContent='';act('food');}
+      else{g.mistakes++;sfx('soft');msg.textContent='That is '+count+'. '+name+' needs '+(b?a+' add '+b:n)+'. Count again.';count=0;kib.innerHTML='';}
+    });
+    tray.appendChild(sc);tray.appendChild(kib);tray.appendChild(acts);
+  }
+  function step(){
+    var need=seq[g.i],N=NEED[need],wrongs=0,list;
+    if(need==='bag')outside=true;
+    look('s-'+N.cue,N.prop);
+    msg.textContent='';
+    if(level===1){
+      bubble.style.display='block';bubble.innerHTML=ART[need];
+      setPrompt(name+' wants this. Can you find it?');
+      list=shuffle([need].concat(sample(ALLTOOLS.filter(function(t){return t!==need;}),2)));
+    }else if(level===2){
+      setPrompt(name+N.tell+'. What does '+name+' need?');
+      list=shuffle([need].concat(sample(ALLTOOLS.filter(function(t){return t!==need;}),4)));
+    }else{
+      setPrompt('Look at '+name+'. What does '+name+' need?');
+      list=level>=5?shuffle(ALLTOOLS):ALLTOOLS;
+    }
+    toolButtons(list,function(t,b){
+      if(G!==g||b.disabled)return;
+      if(t===need){
+        if(need==='food'&&level>=4)scoops();else act(need);
+      }else{
+        wrongs++;g.mistakes++;sfx('soft');b.disabled=true;b.style.opacity=.3;
+        b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');
+        if(wrongs>=2){
+          msg.textContent=name+N.tell+'.';say(name+N.tell);
+          var ok=tray.querySelector('[data-t="'+need+'"]');if(ok&&level<5)ok.classList.add('hint');
+        }else msg.textContent='Not that. Look at '+name+' again.';
+      }
+    });
+  }
+  function finish(){
+    adapt(g);save();
+    look('asleep');
+    setPrompt(name+' is fast asleep. You looked after '+name+' so well!');
+    msg.textContent='';sfx('win');
+    tray.innerHTML='';tray.style.gridTemplateColumns='auto';tray.appendChild(homeButton());
+  }
+  drawDots();step();
+}
+var dogGame={id:'dog',name:'My dog',c:'orange',start:startDog};
+
+/* ---------- 9. Light up (watch, remember, repeat) ---------- */
+var PADS=[{c:'green',f:392},{c:'red',f:523.25},{c:'yellow',f:659.25},{c:'blue',f:783.99}];
+function padTone(i,dur){
+  try{
+    if(!audio())return;
+    var t=ac.currentTime,o=ac.createOscillator(),gn=ac.createGain();
+    o.type='triangle';o.frequency.value=PADS[i].f;
+    gn.gain.setValueAtTime(0.0001,t);
+    gn.gain.exponentialRampToValueAtTime(.34,t+.015);
+    gn.gain.setValueAtTime(.34,t+dur*.7);
+    gn.gain.exponentialRampToValueAtTime(0.0001,t+dur);
+    o.connect(gn);gn.connect(ac.destination);o.start(t);o.stop(t+dur+.05);
+  }catch(e){}
+}
+function buzz(){
+  try{
+    if(!audio())return;
+    var t=ac.currentTime,o=ac.createOscillator(),gn=ac.createGain();
+    o.type='sawtooth';o.frequency.value=110;
+    gn.gain.setValueAtTime(0.0001,t);gn.gain.exponentialRampToValueAtTime(.08,t+.02);gn.gain.exponentialRampToValueAtTime(0.0001,t+.35);
+    o.connect(gn);gn.connect(ac.destination);o.start(t);o.stop(t+.4);
+  }catch(e){}
+}
+var lightGame={id:'lights',name:'Light up',c:'orange',
+  rounds:function(level){return[0,4,5,5,6,7][level];},
+  play:function(level,stage,done){
+    var g=G,start=[0,1,1,2,3,4][level],ms=[0,720,640,560,480,420][level],i;
+    function add(){var n,k=0;do{n=rnd(4);}while(g.seq.length>=2&&n===g.seq[g.seq.length-1]&&n===g.seq[g.seq.length-2]&&++k<9);g.seq.push(n);}
+    if(!g.seq){g.seq=[];for(i=0;i<start;i++)add();}else add();
+    var seq=g.seq,pos=0,busy=true,msg=note(),pads=[];
+    if(g.i===0)setPrompt('Watch the lights, then copy them');
+    else promptEl.textContent=seq.length+' lights. Watch carefully!';
+    var box=h('div',{class:'pads'});
+    PADS.forEach(function(p,k){
+      var b=h('button',{class:'pad',type:'button','aria-label':p.c+' light',style:'background:var(--'+p.c+')'});
+      b.addEventListener('pointerdown',function(e){e.preventDefault();tap(k);});
+      b.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();tap(k);}});
+      pads.push(b);box.appendChild(b);
+    });
+    function lit(k,dur){pads[k].classList.add('lit');padTone(k,dur/1000);setTimeout(function(){pads[k].classList.remove('lit');},dur);}
+    function show(){
+      busy=true;pos=0;msg.textContent='Watch...';
+      seq.forEach(function(n,k){setTimeout(function(){if(G===g)lit(n,ms*.72);},k*ms);});
+      setTimeout(function(){if(G===g){busy=false;msg.textContent='Your turn';}},seq.length*ms);
+    }
+    function tap(k){
+      if(G!==g||busy)return;
+      lit(k,260);
+      if(k===seq[pos]){
+        pos++;
+        if(pos===seq.length){busy=true;msg.textContent='Brilliant!';sfx('good');done(1200);}
+      }else{
+        busy=true;g.mistakes++;buzz();msg.textContent='Oops! Watch again.';
+        setTimeout(function(){if(G===g)show();},1300);
+      }
+    }
+    stage.appendChild(box);stage.appendChild(msg);
+    setTimeout(function(){if(G===g)show();},g.i===0?2400:900);
+  }
+};
+
+/* ---------- 10. Mole pop (reaction, 30 seconds, best score kept per level) ---------- */
+function moleSvg(kind){
+  if(kind==='hog')return'<svg viewBox="0 0 100 100" aria-hidden="true">'+
+    '<polygon points="50,4 58,18 70,8 72,24 86,18 82,34 96,34 88,48 98,58 84,62 90,76 50,90 10,76 16,62 2,58 12,48 4,34 18,34 14,18 28,24 30,8 42,18" fill="#5f3b25"/>'+
+    '<ellipse cx="50" cy="62" rx="30" ry="28" fill="#f3dfc0"/>'+
+    '<circle cx="40" cy="54" r="4.5" fill="#2b2b33"/><circle cx="60" cy="54" r="4.5" fill="#2b2b33"/>'+
+    '<circle cx="41.5" cy="52.5" r="1.5" fill="#fff"/><circle cx="61.5" cy="52.5" r="1.5" fill="#fff"/>'+
+    '<ellipse cx="50" cy="68" rx="6" ry="4.5" fill="#2b2b33"/><path d="M43 76 Q50 81 57 76" fill="none" stroke="#2b2b33" stroke-width="2.5" stroke-linecap="round"/>'+
+    '<ellipse cx="34" cy="66" rx="5" ry="3" fill="#f2879b" opacity=".6"/><ellipse cx="66" cy="66" rx="5" ry="3" fill="#f2879b" opacity=".6"/></svg>';
+  return'<svg viewBox="0 0 100 100" aria-hidden="true">'+
+    '<ellipse cx="50" cy="66" rx="36" ry="40" fill="#8a5a3c"/>'+
+    '<ellipse cx="50" cy="62" rx="24" ry="20" fill="#c49a72"/>'+
+    '<g class="eyes"><circle cx="38" cy="44" r="5" fill="#2b2b33"/><circle cx="62" cy="44" r="5" fill="#2b2b33"/><circle cx="39.6" cy="42.4" r="1.8" fill="#fff"/><circle cx="63.6" cy="42.4" r="1.8" fill="#fff"/></g>'+
+    '<g class="xeyes" fill="none" stroke="#2b2b33" stroke-width="3" stroke-linecap="round"><path d="M33 39 l10 10 M43 39 l-10 10 M57 39 l10 10 M67 39 l-10 10"/></g>'+
+    '<ellipse cx="50" cy="58" rx="10" ry="7" fill="#f2879b"/><ellipse cx="47" cy="56" rx="3" ry="1.6" fill="#fff" opacity=".7"/>'+
+    '<path d="M44 68 Q50 73 56 68" fill="none" stroke="#2b2b33" stroke-width="2.5" stroke-linecap="round"/>'+
+    '<g stroke="#5f3b25" stroke-width="1.6" stroke-linecap="round"><path d="M36 60 L20 56 M36 63 L20 64 M64 60 L80 56 M64 63 L80 64"/></g>'+
+    '<ellipse cx="26" cy="84" rx="12" ry="8" fill="#f2b5a8"/><ellipse cx="74" cy="84" rx="12" ry="8" fill="#f2b5a8"/>'+
+    '<g stroke="#c98778" stroke-width="1.6"><path d="M21 80 v6 M26 79 v7 M31 80 v6 M69 80 v6 M74 79 v7 M79 80 v6"/></g></svg>';
+}
+var moleGame={id:'moles',name:'Mole pop',c:'lime',
+  rounds:function(){return 1;},
+  play:function(level,stage,done){
+    var g=G,DUR=30000,upT=[0,1700,1400,1150,950,800][level],gap=[0,1000,850,700,580,480][level];
+    var maxUp=[0,1,2,2,3,3][level],hogP=[0,0,0,.2,.25,.3][level];
+    S.best=S.best||{};
+    var best=S.best[level]||0,score=0,running=false,endAt=0,holes=[],timers=[],tick=null;
+    setPrompt(hogP?'Tap the moles. Leave the hedgehogs alone!':'Tap the moles as fast as you can!');
+    stage.classList.add('top');
+    var sc=h('span',{class:'msc',text:'0'}),bar=h('i'),bestEl=h('span',{class:'mbest',text:best?'Best '+best:'No best yet'});
+    var hud=h('div',{class:'mhud'},[sc,h('div',{class:'tbar'},[bar]),bestEl]);
+    var field=h('div',{class:'field'});
+    for(var i=0;i<9;i++)(function(i){
+      var crit=h('div',{class:'crit'}),pow=h('span',{class:'pow',text:'+1'});
+      var el=h('div',{class:'hole','aria-label':'Hole '+(i+1)},[h('div',{class:'pit'}),h('div',{class:'win2'},[crit]),h('div',{class:'lip'}),pow]);
+      var H2={el:el,crit:crit,pow:pow,up:false,hit:false,kind:'',t:null};
+      el.addEventListener('pointerdown',function(e){e.preventDefault();whack(H2);});
+      holes.push(H2);field.appendChild(el);
+    })(i);
+    var go=h('button',{class:'block go',type:'button',text:'Start'});
+    go.addEventListener('click',begin);
+    stage.appendChild(hud);stage.appendChild(field);stage.appendChild(go);
+    function later(fn,ms){var t=setTimeout(function(){if(G===g)fn();},ms);timers.push(t);return t;}
+    function down(H2){H2.up=false;H2.hit=false;H2.el.classList.remove('up','hit','hog');}
+    function spawn(){
+      if(!running)return;
+      var upN=holes.filter(function(x){return x.up;}).length;
+      if(upN<maxUp){
+        var free=holes.filter(function(x){return!x.up;}),H2=pick(free);
+        H2.kind=Math.random()<hogP?'hog':'mole';
+        H2.crit.innerHTML=moleSvg(H2.kind);
+        H2.up=true;H2.hit=false;H2.el.classList.add('up');
+        if(H2.kind==='hog')H2.el.classList.add('hog');
+        clearTimeout(H2.t);H2.t=later(function(){down(H2);},upT*(.85+Math.random()*.3));
+      }
+      later(spawn,gap*(.7+Math.random()*.6));
+    }
+    function whack(H2){
+      if(!running||!H2.up||H2.hit)return;
+      H2.hit=true;clearTimeout(H2.t);
+      if(H2.kind==='mole'){score++;H2.pow.textContent='+1';ping(Math.min(7,score%8));}
+      else{score=Math.max(0,score-1);g.mistakes++;H2.pow.textContent='Ouch!';buzz();}
+      sc.textContent=String(score);
+      H2.el.classList.add('hit');
+      H2.t=later(function(){down(H2);},320);
+    }
+    function begin(){
+      if(running)return;
+      go.style.display='none';running=true;endAt=Date.now()+DUR;
+      promptEl.textContent='Go!';sfx('tick');
+      later(spawn,400);
+      tick=setInterval(function(){
+        if(G!==g){clearInterval(tick);return;}
+        var left=Math.max(0,endAt-Date.now());
+        bar.style.transform='scaleX('+(left/DUR)+')';
+        if(left<6000)bar.style.background='var(--red)';
+        if(left<=0)finish();
+      },100);
+    }
+    function finish(){
+      running=false;clearInterval(tick);
+      timers.forEach(clearTimeout);holes.forEach(down);
+      var newBest=score>best;
+      if(newBest){S.best[level]=score;save();}
+      g.endIcon=newBest?'🏆':'⭐';
+      g.endTitle=newBest?'New best score: '+score+'!':'You scored '+score+'!';
+      g.endNote=newBest?(best?'Your old best was '+best+'.':'That is your first best score.'):'Your best is '+best+'. Can you beat it?';
+      promptEl.textContent='Time is up!';sfx('win');
+      done(1400);
+    }
+  }
+};
+
+/* ---------- 11. Brick bash (real time) ---------- */
+var BRICK_SMALL=[
+  ['##########','..........','##########'],
+  ['..##..##..','..##..##..','..........','.#......#.','..######..'],
+  ['....##....','...####...','..######..','.########.'],
+  ['#.#.#.#.#.','.#.#.#.#.#','#.#.#.#.#.','.#.#.#.#.#'],
+  ['.##....##.','####..####','##########','.########.','...####...','....##....'],
+  ['....##....','...####...','..######..','..##..##..','..##..##..'],
+  ['....##....','..######..','##########','..######..','....##....'],
+  ['...####...','..#....#..','..#.##.#..','..#....#..','...####...'],
+  ['#.#.#.#.#.','#.#.#.#.#.','#.#.#.#.#.'],
+  ['##......##','.##....##.','..##..##..','...####...']
+];
+var BRICK_BIG=[
+  ['@@@@@@@@@@','##########','##########','##########','##########','##########'],
+  ['#.#.##.#.#','##########','#@#@##@#@#','##########','###....###','###....###'],
+  ['@@@@@@@@@@','@........@','@.######.@','@.#@@@@#.@','@.######.@','@........@'],
+  ['##......##','.##....##.','..##..##..','...@@@@...','..##..##..','.##....##.'],
+  ['.@@....@@.','@##@..@##@','##########','.########.','...####...','....@@....'],
+  ['....##....','...####...','...#@@#...','...####...','..######..','.##.##.##.'],
+  ['@#@#@#@#@#','#@#@#@#@#@','@#@#@#@#@#','#@#@#@#@#@','..........','##########'],
+  ['##########','#........#','#.@@@@@@.#','#.@....@.#','#.@@@@@@.#','#........#'],
+  ['#........#','##......##','###....###','####..####','##########','@@@@@@@@@@'],
+  ['.########.','#@######@#','##########','##.####.##','###....###','.########.']
+];
+function rr(ctx,x,y,w,hh,r){
+  r=Math.min(r,w/2,hh/2);
+  ctx.beginPath();ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+hh-r);ctx.quadraticCurveTo(x+w,y+hh,x+w-r,y+hh);ctx.lineTo(x+r,y+hh);
+  ctx.quadraticCurveTo(x,y+hh,x,y+hh-r);ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+var brickGame={id:'bricks',name:'Brick bash',c:'indigo',
+  rounds:function(){return 1;},
+  play:function(level,stage,done){
+    var g=G,P=S.prog||(S.prog={}),k=P.bricks=(P.bricks||0)+1;save();
+    var pool=level<=2?BRICK_SMALL:BRICK_BIG,pm=perm(pool.length,99),pat=pool[pm[k%pool.length]],flip=Math.floor(k/pool.length)%2===1;
+    var auto=location.hash==='#autopilot';
+    setPrompt('Move the paddle. Break all the bricks!');
+    stage.classList.add('top');
+    var arena=h('div',{class:'arena'}),cv=h('canvas',{'aria-label':'Brick game. Drag to move the paddle, tap to launch the ball.'});
+    arena.appendChild(cv);stage.appendChild(arena);
+    var ctx=cv.getContext('2d'),W=0,H=0,speed=0;
+    var css=getComputedStyle(document.documentElement);
+    function tok(n){return css.getPropertyValue(n).trim();}
+    var C={ink:tok('--ink'),pad:tok('--blue'),muted:tok('--muted')};
+    var ROWC=['--red','--orange','--yellow','--green','--teal','--blue','--purple'].map(tok);
+    var lives=[0,5,5,4,3,3][level],speedK=[0,.5,.58,.66,.74,.82][level],padK=[0,.3,.25,.21,.18,.16][level],toughP=[0,0,0,0,.12,.25][level];
+    var bricks=[],ball={x:0,y:0,vx:0,vy:0,r:8,held:true},pad={x:0,w:0,h:0,y:0,tx:0},parts=[],broken=0,alive=true,last=0,cols=10;
+    pat.forEach(function(row,r){row.split('').forEach(function(ch,c){
+      if(ch==='.')return;
+      var tough=ch==='@'||Math.random()<toughP;
+      bricks.push({r:r,c:flip?cols-1-c:c,hp:tough?2:1,max:tough?2:1,col:ROWC[r%ROWC.length]});
+    });});
+    var total=bricks.length;
+    function layout(){
+      var rect=arena.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2),oldW=W;
+      W=rect.width;H=rect.height;if(W<10||H<10)return;
+      cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+      var m=W*.04,gp=Math.max(3,W*.008),bw=(W-2*m-gp*(cols-1))/cols,bh=Math.min(H*.055,bw*.55),top=H*.08;
+      bricks.forEach(function(b){b.x=m+b.c*(bw+gp);b.y=top+b.r*(bh+gp);b.w=bw;b.h=bh;});
+      ball.r=Math.max(7,Math.min(W,H)*.018);
+      pad.w=W*padK;pad.h=Math.max(12,H*.024);pad.y=H-H*.08;
+      if(!oldW){pad.x=pad.tx=W/2;}else{pad.x*=W/oldW;pad.tx*=W/oldW;}
+      var ns=(H*.7+W*.3)*speedK;
+      if(!ball.held&&speed){ball.vx*=ns/speed;ball.vy*=ns/speed;}
+      speed=ns;
+      if(ball.held)hold();
+    }
+    function hold(){ball.held=true;ball.x=pad.x;ball.y=pad.y-ball.r-1;}
+    function launch(){if(!ball.held||!alive)return;ball.held=false;var a=Math.random()*.6-.3;ball.vx=speed*Math.sin(a);ball.vy=-speed*Math.cos(a);}
+    function aim(e){var r=cv.getBoundingClientRect();pad.tx=e.clientX-r.left;}
+    cv.addEventListener('pointerdown',function(e){e.preventDefault();aim(e);try{cv.setPointerCapture(e.pointerId);}catch(x){}});
+    cv.addEventListener('pointermove',aim);
+    cv.addEventListener('pointerup',function(){launch();});
+    function key(e){
+      if(G!==g){document.removeEventListener('keydown',key);return;}
+      if(e.key==='ArrowLeft'){pad.tx=pad.x-W*.12;e.preventDefault();}
+      else if(e.key==='ArrowRight'){pad.tx=pad.x+W*.12;e.preventDefault();}
+      else if(e.key===' '||e.key==='ArrowUp'){launch();e.preventDefault();}
+    }
+    document.addEventListener('keydown',key);
+    function onResize(){if(G!==g){window.removeEventListener('resize',onResize);return;}layout();}
+    window.addEventListener('resize',onResize);
+    function burst(b){
+      for(var i=0;i<7;i++)parts.push({x:b.x+b.w/2,y:b.y+b.h/2,vx:(Math.random()-.5)*W*.5,vy:(Math.random()-.8)*H*.4,life:.6,col:b.col});
+    }
+    function hit(b){
+      b.hp--;
+      if(b.hp<=0){broken++;burst(b);if(S.sfx)ping(Math.min(7,7-(b.r%8)));if(broken===total)win();}
+      else sfx('tick');
+    }
+    function win(){
+      alive=false;g.endIcon='🧱';g.endTitle='You broke every brick!';sfx('win');
+      setTimeout(function(){if(G===g)done(300);},1200);
+    }
+    function lose(){
+      lives--;g.mistakes++;buzz();
+      if(lives<=0){
+        alive=false;g.endIcon='⭐';g.endTitle='Good try!';g.endNote='You broke '+broken+' of '+total+' bricks.';
+        setTimeout(function(){if(G===g)done(300);},900);
+      }else hold();
+    }
+    function step(dt){
+      if(auto&&!ball.held)pad.tx=ball.x+(Math.random()-.5)*pad.w*.5;
+      if(auto&&ball.held)launch();
+      pad.x+=(pad.tx-pad.x)*Math.min(1,dt*18);
+      pad.x=clamp(pad.x,pad.w/2,W-pad.w/2);
+      if(ball.held){hold();return;}
+      var n=Math.max(1,Math.ceil(speed*dt/(ball.r*.5))),sdt=dt/n;
+      for(var i=0;i<n;i++){
+        ball.x+=ball.vx*sdt;ball.y+=ball.vy*sdt;
+        if(ball.x<ball.r){ball.x=ball.r;ball.vx=Math.abs(ball.vx);}
+        if(ball.x>W-ball.r){ball.x=W-ball.r;ball.vx=-Math.abs(ball.vx);}
+        if(ball.y<ball.r){ball.y=ball.r;ball.vy=Math.abs(ball.vy);}
+        if(ball.vy>0&&ball.y+ball.r>=pad.y&&ball.y-ball.r<=pad.y+pad.h&&ball.x>=pad.x-pad.w/2-ball.r&&ball.x<=pad.x+pad.w/2+ball.r){
+          var a=clamp((ball.x-pad.x)/(pad.w/2),-1,1)*1.05;
+          ball.vx=speed*Math.sin(a);ball.vy=-speed*Math.cos(a);ball.y=pad.y-ball.r;
+          if(S.sfx)tone0();
+        }
+        if(ball.y-ball.r>H){lose();return;}
+        for(var j=0;j<bricks.length;j++){
+          var b=bricks[j];if(b.hp<=0)continue;
+          var cx=clamp(ball.x,b.x,b.x+b.w),cy=clamp(ball.y,b.y,b.y+b.h),dx=ball.x-cx,dy=ball.y-cy;
+          if(dx*dx+dy*dy>ball.r*ball.r)continue;
+          if(ball.x>=b.x&&ball.x<=b.x+b.w){
+            if(ball.y<b.y+b.h/2){ball.vy=-Math.abs(ball.vy);ball.y=b.y-ball.r;}else{ball.vy=Math.abs(ball.vy);ball.y=b.y+b.h+ball.r;}
+          }else if(ball.y>=b.y&&ball.y<=b.y+b.h){
+            if(ball.x<b.x+b.w/2){ball.vx=-Math.abs(ball.vx);ball.x=b.x-ball.r;}else{ball.vx=Math.abs(ball.vx);ball.x=b.x+b.w+ball.r;}
+          }else if(Math.abs(dx)>Math.abs(dy))ball.vx=dx<0?-Math.abs(ball.vx):Math.abs(ball.vx);
+          else ball.vy=dy<0?-Math.abs(ball.vy):Math.abs(ball.vy);
+          hit(b);break;
+        }
+        if(!alive)return;
+      }
+    }
+    function tone0(){try{if(!audio())return;var t=ac.currentTime,o=ac.createOscillator(),gn=ac.createGain();o.type='sine';o.frequency.value=196;gn.gain.setValueAtTime(.0001,t);gn.gain.exponentialRampToValueAtTime(.12,t+.01);gn.gain.exponentialRampToValueAtTime(.0001,t+.15);o.connect(gn);gn.connect(ac.destination);o.start(t);o.stop(t+.2);}catch(e){}}
+    function draw(){
+      ctx.clearRect(0,0,W,H);
+      bricks.forEach(function(b){
+        if(b.hp<=0)return;
+        rr(ctx,b.x,b.y,b.w,b.h,Math.min(8,b.h*.3));ctx.fillStyle=b.col;ctx.fill();
+        ctx.fillStyle='rgba(255,255,255,.25)';rr(ctx,b.x+3,b.y+3,b.w-6,b.h*.28,3);ctx.fill();
+        if(b.max===2){
+          ctx.lineWidth=3;
+          if(b.hp===2){ctx.strokeStyle='rgba(255,255,255,.85)';rr(ctx,b.x+2,b.y+2,b.w-4,b.h-4,6);ctx.stroke();}
+          else{ctx.strokeStyle='rgba(0,0,0,.45)';ctx.beginPath();ctx.moveTo(b.x+b.w*.3,b.y+2);ctx.lineTo(b.x+b.w*.45,b.y+b.h*.55);ctx.lineTo(b.x+b.w*.62,b.y+b.h*.35);ctx.lineTo(b.x+b.w*.75,b.y+b.h-2);ctx.stroke();}
+        }
+      });
+      parts.forEach(function(p){ctx.globalAlpha=Math.max(0,p.life/.6);ctx.fillStyle=p.col;ctx.fillRect(p.x-3,p.y-3,6,6);});
+      ctx.globalAlpha=1;
+      rr(ctx,pad.x-pad.w/2,pad.y,pad.w,pad.h,pad.h/2);ctx.fillStyle=C.pad;ctx.fill();
+      ctx.beginPath();ctx.arc(ball.x,ball.y,ball.r,0,Math.PI*2);ctx.fillStyle=C.ink;ctx.fill();
+      for(var i=0;i<lives;i++){ctx.beginPath();ctx.arc(18+i*22,18,7,0,Math.PI*2);ctx.fillStyle=C.muted;ctx.fill();}
+      if(ball.held&&alive){
+        ctx.fillStyle=C.muted;ctx.textAlign='center';
+        ctx.font='600 '+Math.round(Math.max(18,Math.min(W,H)*.05))+'px Fredoka, Trebuchet MS, sans-serif';
+        ctx.fillText('Tap to launch the ball',W/2,H*.62);
+      }
+    }
+    function frame(t){
+      if(G!==g)return;
+      var dt=last?Math.min(.033,(t-last)/1000):0;last=t;
+      if(!W)layout();
+      if(W&&!document.hidden){
+        if(alive)step(dt);
+        parts.forEach(function(p){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=H*1.2*dt;p.life-=dt;});
+        parts=parts.filter(function(p){return p.life>0;});
+        draw();
+      }
+      requestAnimationFrame(frame);
+    }
+    layout();requestAnimationFrame(frame);
+  }
+};
+
+var GAMES=[countGame,lettersGame,shapesGame,nextGame,pairsGame,copyGame,musicGame,lightGame,moleGame,brickGame];
+
+
+/* ---------- puzzles: a fresh layout every time, never the same one twice ---------- */
+function dayNum(){var d=new Date();return Math.floor((d.getTime()-d.getTimezoneOffset()*60000)/86400000);}
+function seeded(seed){
+  return function(){
+    seed|=0;seed=seed+0x6D2B79F5|0;
+    var t=Math.imul(seed^seed>>>15,1|seed);
+    t=t+Math.imul(t^t>>>7,61|t)^t;
+    return((t^t>>>14)>>>0)/4294967296;
+  };
+}
+function sshuffle(a,r){a=a.slice();for(var i=a.length-1;i>0;i--){var j=Math.floor(r()*(i+1)),t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function perm(n,salt){var a=[];for(var i=0;i<n;i++)a.push(i);return sshuffle(a,seeded(salt));}
+/* each puzzle type walks its own counter: a finished puzzle, or one left over from yesterday, moves on to the next */
+function puz(id){
+  var P=S.puz||(S.puz={}),p=P[id]||(P[id]={n:0,day:dayNum(),st:null}),d=dayNum();
+  if(p.st&&(p.st.done||p.day!==d)){p.n++;p.st=null;}
+  p.day=d;return p;
+}
+function solvedToday(id){var T=S.solved;return T&&T.day===dayNum()?(T[id]||0):0;}
+function markSolved(id){var d=dayNum();if(!S.solved||S.solved.day!==d)S.solved={day:d};S.solved[id]=(S.solved[id]||0)+1;}
+function startPuzzle(def){
+  if(limitReached())return allDone();
+  screen='game';
+  G={def:def,puzzle:true,i:0,total:0,mistakes:0};
+  buildShell();
+  def.open(stageEl,puz(def.id));
+  save();
+}
+function puzzleDone(def,stage){
+  markSolved(def.id);save();
+  var nx=h('button',{class:'block go',type:'button',text:'Next puzzle'});
+  nx.addEventListener('click',function(){startPuzzle(def);});
+  var hm=h('button',{class:'block go alt',type:'button',text:'Choose a game'});
+  hm.addEventListener('click',home);
+  stage.appendChild(h('div',{class:'endbtns'},[nx,hm]));
+}
+function note(text){return h('p',{class:'note',text:text||''});}
+function actKeys(onDel,onGo){
+  var del=h('button',{class:'key act',type:'button','aria-label':'Rub out',text:'←'});
+  del.addEventListener('click',onDel);
+  var go=h('button',{class:'key act',type:'button','aria-label':'Check my word',text:'✓'});
+  go.addEventListener('click',onGo);
+  return h('div',{class:'acts'},[del,go]);
+}
+/* typing goes through the device's own keyboard */
+function typeBox(o){
+  var inp=h('input',{class:'typein',type:'text',autocomplete:'off',autocorrect:'off',autocapitalize:'none',spellcheck:'false',enterkeyhint:'go',inputmode:'text',placeholder:'Type here','aria-label':o.label});
+  function clean(){
+    var v=inp.value.toLowerCase().replace(/[^a-z]/g,'');
+    if(o.allow)v=v.split('').filter(function(c){return o.allow.indexOf(c)>=0;}).join('');
+    v=v.slice(0,o.max);
+    if(inp.value!==v)inp.value=v;
+    o.onChange(v);
+  }
+  inp.addEventListener('input',clean);
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter'||e.keyCode===13){e.preventDefault();o.onEnter();}});
+  inp.setValue=function(v){inp.value=v;clean();};
+  return inp;
+}
+
+/* A. Guess the word */
+function scoreGuess(guess,word){
+  var res=[],rem=word.split(''),i,k;
+  for(i=0;i<word.length;i++){if(guess.charAt(i)===word.charAt(i)){res[i]='g';rem[i]=null;}else res[i]='n';}
+  for(i=0;i<word.length;i++){if(res[i]!=='g'){k=rem.indexOf(guess.charAt(i));if(k>=0){res[i]='y';rem[k]=null;}}}
+  return res;
+}
+var wordPuz={id:'word',name:'Guess the word',
+  open:function(stage,p){
+    var g=G,st=p.st;
+    if(!st){
+      var list=S.diff<=2?W3:(S.diff<=4?W4:W5),pm=perm(list.length,4711+list.length),w0=list[pm[p.n%list.length]];
+      st=p.st={w:w0[0],e:w0[1],clue:S.diff<=3?2:3,g:[],done:false,won:false,shown:false};
+    }
+    var word=st.w,L=word.length,TRIES=6,cur='',rows=[];
+    stage.classList.add('top','tight');
+    var board=h('div',{class:'wboard'});
+    /* an invisible text box lies over the grid: tapping the grid opens the device keyboard, letters fill the grid */
+    var inp=h('input',{class:'ghost',type:'text',autocomplete:'off',autocorrect:'off',autocapitalize:'none',spellcheck:'false',enterkeyhint:'go',inputmode:'text','aria-label':'Type your guess'});
+    var form=h('form',{class:'wform',action:'#'},[inp]);
+    var wrap=h('div',{class:'wwrap'},[board,form]);
+    var msg=note('Tap the boxes to type'),extra=h('div',{class:'show'});
+    for(var r=0;r<TRIES;r++){
+      var row=h('div',{class:'wrow'}),cells=[];
+      for(var c=0;c<L;c++){var cell=h('div',{class:'wcell'});cells.push(cell);row.appendChild(cell);}
+      board.appendChild(row);rows.push({el:row,cells:cells});
+    }
+    function promptText(){return st.shown?'Clue: '+st.e+'   Type '+L+' letters.':'Guess the word. Type '+L+' letters.';}
+    function paint(){
+      rows.forEach(function(R,r){
+        var guess=st.g[r],sc=guess?scoreGuess(guess,word):null,live=!guess&&r===st.g.length&&!st.done;
+        R.cells.forEach(function(cell,c){
+          cell.textContent=guess?guess.charAt(c):(live?cur.charAt(c):'');
+          cell.className='wcell'+(sc?' '+sc[c]:'')+(live?' now':'')+(live&&c<cur.length?' typed':'');
+        });
+      });
+    }
+    function fit(){
+      if(G!==g)return;
+      var vv=window.visualViewport,vh=vv?vv.height:window.innerHeight,off=vv?vv.offsetTop:0;
+      var top=board.getBoundingClientRect().top-off,availH=vh-top-12,availW=stage.clientWidth-20,gap=6;
+      var size=Math.floor(Math.min((availW-gap*(L-1))/L,(availH-gap*(TRIES-1))/TRIES,68));
+      board.style.setProperty('--c',Math.max(26,size)+'px');
+    }
+    function setCur(v){cur=v;if(inp.value!==v)inp.value=v;paint();}
+    inp.addEventListener('input',function(){
+      if(st.done)return;
+      setCur(inp.value.toLowerCase().replace(/[^a-z]/g,'').slice(0,L));
+      msg.textContent='';
+    });
+    function submit(){
+      if(G!==g||st.done)return;
+      if(cur.length<L){
+        msg.textContent='Type '+L+' letters first.';sfx('soft');
+        var R=rows[st.g.length].el;R.classList.remove('shake');void R.offsetWidth;R.classList.add('shake');
+        inp.focus();return;
+      }
+      st.g.push(cur);setCur('');
+      if(st.g[st.g.length-1]===word){st.done=true;st.won=true;}
+      else if(st.g.length>=TRIES)st.done=true;
+      save();paint();
+      if(st.done)finish();else{sfx('tick');clue();inp.focus();}
+    }
+    form.addEventListener('submit',function(e){e.preventDefault();submit();});
+    inp.addEventListener('keydown',function(e){if(e.key==='Enter'||e.keyCode===13){e.preventDefault();submit();}});
+    function finish(){
+      inp.blur();form.style.display='none';check.style.display='none';msg.textContent='';
+      extra.innerHTML='';extra.appendChild(h('span',{class:'cluepic',text:st.e}));
+      setPrompt(st.won?'You got it! The word is '+word+'.':'The word was '+word+'.');
+      if(st.won)sfx('win');
+      stage.classList.remove('tight');
+      puzzleDone(wordPuz,stage);
+    }
+    function clue(){
+      if(st.done||st.shown||st.g.length<st.clue||extra.firstChild)return;
+      var b=h('button',{class:'block go alt',type:'button',text:'Show a clue'});
+      b.addEventListener('click',function(){st.shown=true;save();extra.innerHTML='';promptEl.textContent=promptText();say('Here is a clue.');inp.focus();});
+      extra.appendChild(b);
+    }
+    var check=h('button',{class:'block go',type:'button',text:'Check'});
+    check.addEventListener('click',submit);
+    stage.appendChild(wrap);stage.appendChild(msg);stage.appendChild(h('div',{class:'endbtns'},[check,extra]));
+    paint();
+    setPrompt(promptText(),'Guess the word. It has '+L+' letters.');
+    clue();
+    fit();
+    if(window.visualViewport)window.visualViewport.addEventListener('resize',fit);
+    window.addEventListener('resize',fit);
+    inp.focus();
+    setTimeout(fit,350);
+  }
+};
+
+/* B. Sort it */
+var CATS=[
+  ['Farm animals',['🐷','🐮','🐔','🐑','🐴']],['Sea animals',['🐟','🐙','🐳','🐬','🦀']],
+  ['Minibeasts',['🐝','🐜','🐛','🐞','🐌']],['Fruit',['🍎','🍌','🍇','🍓','🍊','🍐','🍉']],
+  ['On wheels',['🚗','🚌','🚲','🚂','🚜','🚒']],['In the sky',['☀️','🌙','⭐','☁️','🌈']],
+  ['Clothes',['🎩','👕','👟','👗','👖']],['Bakery treats',['🍞','🍪','🍰','🍩']],
+  ['Music',['🎸','🎺','🎹','🎻','🥁']],['Balls',['⚽','🏀','🎾','🏈']],['Plants',['🌳','🌵','🌻','🌷','🌴']],
+  ['Vegetables',['🥕','🌽','🥦','🍅','🥔']],['Wild animals',['🦁','🐯','🐘','🦒','🦓','🐵']],
+  ['Birds',['🐦','🦆','🦉','🐧','🦜']],['Faces',['😀','😢','😴','😮','😡']],['Drinks',['☕','🥛','🧃','🍵']],
+  ['Things that fly',['✈️','🚁','🚀','🎈']],['On the water',['⛵','🚢','🚤','🛶']],['Weather',['☔','⚡','❄️','🌪️']],
+  ['Numbers',['1️⃣','2️⃣','3️⃣','4️⃣','5️⃣']],['Tools',['🔨','🔧','✂️','🧹']],['Pets',['🐶','🐱','🐹','🐰']]
+];
+var BANDCOL=['blue','purple','pink','green'];
+var sortPuz={id:'sort',name:'Sort it',
+  open:function(stage,p){
+    var g=G,st=p.st;
+    if(!st)st=p.st={k:S.diff<=2?3:4,m:S.diff>=5?4:3,seed:p.n*7919+101,solved:[],done:false};
+    var K=st.k,M=st.m,r=seeded(st.seed),cats=sshuffle(CATS,r).slice(0,K),tiles=[];
+    cats.forEach(function(c,ci){sshuffle(c[1],r).slice(0,M).forEach(function(e){tiles.push({e:e,c:ci});});});
+    tiles=sshuffle(tiles,r);
+    var bands=h('div',{class:'bands'}),grid=h('div',{class:'sgrid'+(K*M>9?' c4':'')}),msg=note(),sel=[],busy=false;
+    function band(ci){
+      bands.appendChild(h('div',{class:'band',style:'background:var(--'+BANDCOL[ci]+')'},[
+        h('b',{text:cats[ci][0]}),
+        h('span',{text:tiles.filter(function(t){return t.c===ci;}).map(function(t){return t.e;}).join(' ')})
+      ]));
+    }
+    function finish(){
+      grid.style.display='none';msg.textContent='';
+      setPrompt('All sorted!');sfx('win');
+      puzzleDone(sortPuz,stage);
+    }
+    st.solved.forEach(band);
+    tiles.forEach(function(t){
+      if(st.solved.indexOf(t.c)>=0)return;
+      var b=h('button',{class:'block stile',type:'button',text:t.e});
+      t.b=b;
+      b.addEventListener('click',function(){
+        if(G!==g||busy||st.done)return;
+        var at=sel.indexOf(t);
+        if(at>=0){sel.splice(at,1);b.classList.remove('sel');return;}
+        if(sel.length>=M)return;
+        sel.push(t);b.classList.add('sel');sfx('tick');msg.textContent='';
+        if(sel.length<M)return;
+        busy=true;
+        setTimeout(function(){
+          if(G!==g)return;
+          var same=sel.every(function(x){return x.c===sel[0].c;}),ci=sel[0].c;
+          if(same){
+            sel.forEach(function(x){x.b.style.display='none';});
+            st.solved.push(ci);band(ci);sfx('good');say(cats[ci][0]);
+            if(st.solved.length===K){st.done=true;setTimeout(function(){if(G===g)finish();},1200);}
+            save();
+          }else{
+            var counts={};sel.forEach(function(x){counts[x.c]=(counts[x.c]||0)+1;});
+            var close=Object.keys(counts).some(function(k){return counts[k]===M-1;});
+            msg.textContent=close?'Nearly. Just one of those is in the wrong group.':'Not a group. Try again.';
+            sfx('soft');
+            sel.forEach(function(x){x.b.classList.remove('sel');x.b.classList.remove('shake');void x.b.offsetWidth;x.b.classList.add('shake');});
+          }
+          sel=[];busy=false;
+        },450);
+      });
+      grid.appendChild(b);
+    });
+    stage.appendChild(bands);stage.appendChild(grid);stage.appendChild(msg);
+    setPrompt('Find '+(M===4?'four':'three')+' that go together');
+  }
+};
+
+/* C. Word garden: common words set the goal; any real word is accepted */
+var GARDEN={"achst":"ash cash cast cat catch cats chat has hat hats sat that|aah acc acct act acts aha asst att attach casa casts cha chats hash hast hatch sac sacs sash sass scat scats shah shahs stacc stash stat stats tach tact tass tat tats thatch","amnpt":"ant man map mat nap pan pant pat tan tap|amp amt ana anat ann anna anta app apt ataman atm atman att attn mam mama mamma mana manana manat manna manta naan natant pam pampa panama pap papa tam tamp tana tat","odght":"dog dot good got hog hood hot odd too|dodo doggo dogtooth god godhood goo hod hoo hoodoo hoot oho ooh otto tho tod tog toot tooth tot","inpst":"inn its pin pins pip pit sip sit snip spin tin tins tip tips|iii init innit inns insist insists inst int inti intis nisi nit nits pint pints pipit pipits pippin pippins pips pits psi psis sin sins sips sis sits snips snit snits spins spit spits stint stints tint tints titi titis","edhnt":"den dent end hen need net teeth ten tend tent the then|dded deed detent detente edh entente ethene heed heeded hent nee needed netted ted tee teen teethe tended tenet tenne tenth teth thee","ubnst":"bun buns bus but nun nut nuts sun tub|bub bubs bunt bunts buss bust busts buts butut bututs nub nubs nuns snub snubs stub stubs stun stuns stunt stunts sub subs sunn suns suss tubs tun tuns tut tuts tutu tutus usu","ohpst":"hoop hop hops hot pop post pot pots shop shot spot stop too top tops|hoo hoops hoot hoots hosp host hosts hotpot hotpots hots hotshot hotshots oho ohs ooh oohs oops opp opt opts otto pho phot photo photos phots pooh poohs pops pos posh poss posts potshot potshots potto pottos shoo shoos shoot shoots shops shots soot sooth sooths sop soph sops sot sots spots stoop stoops stops stoss tho toot tooth toots tosh toss tosspot tot tots","ednrs":"den dress end ends need red see seed seen send|dded deed deer dense der dree dresser dressers dresses ere erne ernes err errs esse nee needed needs nerd nerds ness nesses redd redden rede redness redress reds reed rend render renders rends resend seeded seeder seeders seeds seer seeress sees sender sends sene sense senses sere serene sneer sneers","idgnp":"did dig din dip inn pig pin pip|dding digging ding dinning dipping dpi gid gig gigging ginning ign iii ind indign inning nipping pidgin piggin pigging ping pinning piping pippin pipping","ampst":"map maps mat mats pass past pasta pat sat stamp tap taps|amass amp amps amt app apps apt asap asp asps asst atm att mam mama mamas mamma mams mass mast masts pam pampa pampas pap papa papas paps pastas pasts pats sap saps sass spa spam spams spas spasm spasms spat spats stamps stat stats tam tamp tamps tams tapas tass tat tats","enpst":"nest net nets pen pens pet pets see seen sent set step ten tent test|entente ententes epee epees esp esse nee ness nesses nests peen peens peep peeps penne pensee pent pep peps pest pests seep seeps sees sene sennet sense senses sente sepses sept septet septets septs sestet sestets sets sett settee settees setts spent steep steepen steeps stent stents steppe steppes steps stet stets tee teen teens tees tenet tenets tenne tens tense tenses tents tepee tepees testee testees testes tests tsetse tsetses","odgln":"dog doll gold good log long nod noon odd old|dodo doggo dol don dong god gong goo googol goon logo logon loll loo loon nog nolo non","acrst":"art car cars cart cast cat cats rat rats sat star start|acc acct act acts arc arcs arr arras arts asst astr att attar attract attracts caracara carat carats carcass carts casa cascara cascaras casts cataract crass rata sac sacra sacs sass scar scars scat scats stacc stars starts stat stats strata tact tar tars tartar tartars tass tat tats tract tracts trass","ealst":"ate east eat eats late less let sea seal seat see sell set tale tea tell test|alae alate ale alee ales allee allele alleles asses assess assesses asset assets atlases attest attests ease easel easels eases eel eels elate elates ell ells else esse estate estates eta etas lase lases lasses latest latte lattes lea leal leas lease leases least lee lees leet lessee lessees lesses lets sale sales sallet sallets sasses sate sateless sates seals seas seats seel seels sees sells sestet sestets seta setae sets sett settee settees settle settles setts slate slates sleet sleets stale stales stases state states steal steals steel steels stela stelas stele steles stellate stet stets tael tales tasse tassel tassels tasses tasset tassets taste tastes tattle tattles teal teals teas tease teasel teasels teases tee tees tel tells telltale tels tesla teslas testa testas testate testates testee testees testes tests tsetse tsetses","aeprt":"ape art ate ear eat paper part pat pea pear rat tap tape tea tear trap treat|aerate apart app appear apt apter are area arete arr arrear att attar eater era errata eta pap papa paperer par para parapet pare parer parr parterre pate patter peart peat prate prater prepare pretreat rap raper rapparee rappee rapper rapt rare rata rate rater ratter rattrap reap reaper rear reata repaper repartee repeat repeater taper tapper tappet tar tare tarp tarpaper tartar tartrate tat tater tatter terra tetra trapper treater","odntw":"dot down nod noon not now odd own ton too tow town two won wood wow|dodo don dow downtown non nowt onto otto tod toot tot wont woo wot","taehm":"ate eat hat heat mat meat meet met tame tea team teeth that the them|amt atm att emmet eta hamate hate heath mahatma mammet mate matte meta mete tam tat teammate tee teem teethe teth thee theme theta","odlpt":"doll dot loop lot odd old plot pod pool pop pot told too tool top|dodo dol dollop dolt loll lollop loo loot lop lotto opp opt otto plod plop pol poll polo pood potto tod toll toot tot","obltw":"blow boo boot bow bowl lot low owl too tool tow two wool wow|blob blot blotto bob boll bolo bolt bot bott bowwow lob lobo loll loo loot lotto obb otto toll toot tot woo wot","odlrw":"doll door low odd old owl rod roll row wood wool word world wow|dodo dol dolor dor dow droll drool loll loo lord odor ord ordo roo rood wold woo","tenor":"net not note otter root rot ten tent toe ton tone too torn tree|enroot entente enter enteron entree ert eterne netter nonet onto ort otto rennet rent renter rete retene retort retro rooter rote rotenone rotor rotten rotter rte tee teen teeter tenet tenne tenno tenon tenor tenter terete tern terr terrene terret terror tetter toner tonne toot tooter tor tore torero torr torrent tort torte tot tote totter totterer treen tret tron trot trotter","taben":"ant ate bat beat bent bet eat neat net tan tea ten tent|abate abet anat anent anta ante antenna antennae att attn bant bate batt batten beaten beet bennet beta betta eaten enate entente eta etna natant neaten tab tana tannate tat tee teen tenant tenet tenne","adnps":"add and dad nap naps pad pan panda pans pass sad sand snap|adds ana anas ann anna annas app apps asap asp asps assn dada dadas dads dap naan naans pads panada pandas pap papa papas paps sands sans sap saps sass snaps spa span spans spas","ebflt":"bee bell belt bet elf fee feel feet fell felt left let tell|beef beet beetle befell bel belle betel bleb ebb eel eff effete eft ell feeble fete fettle flee fleet lee leet tee tel","aclmp":"all call calm camp cap clap lamp lap llama map pal palm|acc ala alp alpaca amp app appall cal calla calpac cam clam clamp lac lam lama mac mall malm mam mama mamma mammal pall palp pam pampa pap papa papal","ebstw":"bee bees best bet see set sew sweet test web west wet|beet beets beset besets bests bets ebb ebbs esse ewe ewes sees sestet sestets sets sett settee settees setts sews stet stets stew stews sweets tee tees testee testees testes tests tsetse tsetses twee tweet tweets webs wee wees wets wettest","adlpy":"add all dad day lady lap lay pad pal pay play|ala allay ally allyl alp app appall apply dada daddy dally dap dyad lad paddy pall palp pap papa papal papaya pappy payday playa pya yap yappy","laefp":"all apple elf fall feel fell flap lap leaf pal peel|ala alae ale alee alfalfa allee allele alp appall appeal appel appellee eel ell falafel fallal feal fella flea flee lapel lea leal leap lee paella pale pall palp papal peal pelf plea","ebdno":"bed bee bend bone den doe done end need none one|bedded been benne bobbed bode boned bonne dded deb deed dobbed donee donne donnee ebb ebon eddo eon neb nee needed neon nodded node oboe ode odeon","oclnw":"clown cool cow low noon now owl own won wool wow|coco cocoon col coll colon con conn coo cowl loco loll loo loon nolo non woo","edfls":"elf fed fee feed feel fell less see seed sell sled|dded deed def del dele dell dells eel eels eff effs eld ell ells else esse feds feeds feels fees fells fess fesses flee flees lee lees lessee lessees lesses seeded seedless seeds seel seels sees self selfless sells sledded sleds","odfrt":"door dot food foot fort odd rod roof root rot too|dodo doff dor foo for ford fordo fro odor off oft oof ord ordo ort otto roo rood rotor tod toff toft toot tor torr tort tot trod trot","egmst":"egg eggs gem get meet mess met see set stem test|egest egests emmet emmets esse esteem esteems gee gees geese gems gets meets meg megs mem meme memes mems meseems messes mestee mete metes mtge seem seems sees sem sememe sestet sestets sets sett settee settees setts stems stet stets stge tee teem teems tees testee testees testes tests tmeses tsetse tsetses","ehnos":"hen hens hose none nose one see seen she shoe shoes|eon eons esse hone hones hoses nee neon ness nesses noes nones nonsense noose nooses noses noshes oneness ones sees sene sense senses sheen shes shone sone sones","ehrst":"her here rest see set she teeth test the three tree|ere err errs ersh erst ert esse ester esters ether heres heths reest rests rete rhet rte seer seeress sees seethe seethes sere sestet sestets sets sett settee settees setter setts sheer sheers sheet sheets shes steer steers stere stet stets street streets stress stresses tee tees teeter teeters teethe teethes terete terr terret terse testee testees tester testers testes tests teth tether tethers teths tetter thee thees there these theses threes thresh thresher threshes trees tres tress tresses tret tsetse tsetses","ielnp":"inn lie line lip nine pie pile pin pine pip pipe|iii ill inline lei lien lii lin linen linin linn nil ninepin penile penni pilei pili pill pipeline pippin","ohlpw":"hoop hop how loop low owl pool pop who wool wow|hollow holp hoo howl loll lollop loo lop oho ooh opp pho plop plow pol poll polo pooh pow powwow whoop whop woo","abdny":"add and any baby bad ban band bay dad day|aba abb abba aby ana ann anna baa baba banana bandanna bandy banyan dab dada daddy dandy dyad naan nab nanny nay","adhls":"add all ash dad dash had hall has sad salad|aah adds aha ala alas dada dadas dads dah dahl dahls dahs halal halala hallah hallahs halls hash lad lads lash lass sal salads salsa salsas sash sass shad shads shah shahs shall slash","daimn":"add aid and dad did dim din mad mid mind|adman admin amid dada daman diam ind madam madman maid maidan midi naiad","admry":"add arm dad day mad may ram ray yam yard|armada army arr array dada daddy damar dammar dram drama dray dryad dyad madam mam mama mamma mammary mammy mar mara marry maya mayday rad radar rya yardarm","eagps":"age ape egg eggs page pea peas peg sea see|agape agee ages apes appease appeases apse apses asepses asses assess assesses ease eases epee epees esp esse gape gapes gases gasses gee gees geese pages pase passage passages passe passes peag peags peep peeps pegs pep peps sage sages sasses seas seep seepage seeps sees sepses spae","ahlpt":"all hall hat lap pal pat path tall tap that|aah aha ala alp alpha alt app appall apt atlatl att halal halala hallah halt hap lat lath pah palatal pall palp pap papa papal phat plat tala tat","ebgls":"bee bees beg bell egg eggs leg less see sell|begs bel belle belles bells bels bleb blebs bless blesses ebb ebbs eel eels ell ells else esse gee gees geese gel gels glebe glebes glee lee lees leges legless legs lessee lessees lesses seel seels sees sells","obnrw":"boo born bow brown noon now own row won wow|bob bonbon bonobo boon boor bor boron borrow bowwow bro brow non nor obb orb rob roo woo worn","ocdkl":"clock cod cold cook cool doll lock look odd old|clod coco col coll coo doc dock dodo dol kolo koodoo kook loco loll loo","ocrtw":"cot cow crow root rot row too tow two wow|coco coo coot cor corr oct orc ort otto roc rococo roo rotor toot tor torr tort tot trot trow woo wort wot","ndefi":"den din dine end fin find fine inn need nine|defend defended define defined denied dinned effendi fen fend fiend finned ind indeed indef indene indie infin nee needed nide niff","idprt":"did dip dirt drip pip pit rid rip tip trip|dir dit dpi iii pipit rit titi","odmnp":"moo mood moon mop nod noon odd pod pond pop|dodo dom don doom mod mom mon mono nom non opp pom pomp pompom pood","eilmt":"let lie lime meet melt met tell tie tile time|eel elem elemi elite ell elm emit emmet item lee leet lei lemme lite little mel melee mem meme mete mettle mile millet millieme millime mime mite tee teem tel title tittle","neitw":"inn net new nine ten tent tin twin went win|entente entwine init innit int intent inti intine intwine nee newt nineteen nit nitwit teen tenet tenne tine tint tween twine ween weenie wen wienie","nikot":"ink inn into knit knot noon not onion tin ton|inion init initio innit int inti ion kin kinin kink kino ninon nit non nook notion oink onto tint","eabsy":"base bee bees bye easy eye sea see yes|abase abases abbe abbes abbess abbesses abbey abbeys abysses asses assess assesses aye ayes babe babes bases basses bey beys byes ease eases ebb ebbs essay essays esse eyas eyases eyes sasses seas sees yea yeas yeses","tabho":"bat bath boat boot both hat hot that too|abbot att baht batt booth bot bott hoot oat oath otto tab taboo tat tattoo tho toot tooth tot","ablmy":"all baby ball bay lamb lay llama may yam|aba abb abba abl aby ala alb alba allay ally allyl amyl baa baba bal bally balm balmy blab blamably lab lablab lam lama mall malm mam mama mamba mamma mammal mammy maya myall","eadft":"ate date eat fade fed fee feed feet tea|dated dded dead deaf deed def defeat defeated deft eff effete eft eta fate fatted feat feta fete taffeta tatted ted tee","daeln":"add and dad den end land lead lend need|addend addenda addle aneled dada dale dandle dded dead deaden deal dean dedal deed del dele dell eland eld ennead lad lade laden ladle leaden needed needle","ademp":"add ape dad damp mad made map pad pea|amp app dada dame dammed damped dap dead edamame edema madam madame mam mama mamma mapped mead padded pam pampa pap papa","dagor":"add dad dog door drag good odd road rod|ado ardor dada dado dag dago darg dodo doggo doodad dor dora dorado gad goad god grad odor ogdoad ord ordo rad radar rood","adhrt":"add art dad dart had hard hat rat that|aah aha arr att attar dada dah dat data drat haar hardhat hart rad radar rah rata rath tad tahr tar tartar tat thar trad","eagtv":"age ate eat egg gate gave get tea vet|agate agave agee ave eatage eave eta eve gavage gee tee veg vegetate","saehw":"ash has saw sea see sew she was wash|ashes asses assess assesses awash awes ease eases esse ewes hash hashes haws hawse hawses heehaws hews sash sashes sass sasses saws seas sees seesaw seesaws sews shah shahs shaw shes shew shews shh ssh swash swashes washes waws wees","tahin":"ant hat hint hit tan than that thin tin|ait anat anta anti att attain attaint attn init innit int inti natant ninth nit tahini tain taint tana tanh tannin tat tint titan titania titi titian","anrty":"ant any art ran rat ray tan tray yarn|ana anat ann anna anta arr arrant array arty att attar attn atty naan nanny nary natant natty nay rant rata ratan rattan ratty rya tana tantara tantra tar tarn tarry tartan tartar tarty tat tatty tayra tyranny tyrant","ibept":"bib bit bite pie pip pipe pit tie tip|bibb bitt iii petit petite piet pipette pipit tippet titi","obnpt":"boo boot noon not pop pot ton too top|bob bonbon bonobo boon bop bot bott non obb onto opp opt otto pontoon potto toot tot","odemr":"doe dome door moo mood more odd rod room|demo demode dodder dodo doer dom doom dor dorm dormer eddo emo erode error memo mod modded mode modem mom moor ode odor ord order ordered orderer ordo ore redo rode rodeo roe rom romeo roo rood roomer","idhps":"did dip dish hid hip his pip ship sip|dips dis dpi hips hispid hiss iii phi phis phish pips pish psi psid psis ships sips sis","odhpr":"door drop hood hoop hop odd pod pop rod|dodo dor dorp droop hod hoo hoodoo hor horror odor oho ooh opp ord ordo pho pood pooh poor pro prod prop propr rho roo rood","idkns":"did din ink inn kid kind kiss sink skin|dink dins dis disk disks iii ind inns kids kidskin kin kinds kinin kink kinks nisi sin sinks sins sis siskin siskins ski skid skids skink skinks skins skis","dilmo":"did dim doll lid mid mild mood odd old|dido dill dodo dol dom doom idiom idol lido midi mod mold olid","tehlo":"hot let lot teeth tell the toe too tool|helot holt hoot hotel leet lethe loot lotto otto tee teethe tel teth thee theol tho thole tole toll toot tooth tootle tot tote","ehlps":"help less peel see sell she sheep shell sleep|eel eels ell ells else epee epees esp esse heel heelless heels hells helpless helps hep lee lees lessee lessees lesses peels peep peeps pep peps seel seels seep seeps sees sells sepses shells shes sleeps spell spells","nekow":"knee know new none noon now one own won|enow eon keen ken keno knew known nee neon non nook ween wen wonk","ofglw":"fog glow golf log low owl wolf wool wow|flog flow fol foll follow foo fool fowl goo goof googol logo logoff loll loo off oof wog woo woof","uglmp":"gum lump mug mum plug plum pull pump pup|glum gull gulp lug lull lulu mull mump muumuu plump pug pul pulp ump","ohktw":"hook hot how too took tow two who wow|hoo hoot kook koto kowtow oho ooh otto tho toot tooth tot wok woo wot","ohmnt":"hot month moo moon moth noon not ton too|hon hoo hoot mho mom mon mono moot mot motmot motto nom non ohm oho onto ooh otto tho tom toot tooth tot","tilos":"its list lit lost lot sit slot too tool|lilt lilts lists loot loots loti lots lotto ostosis otitis otto silt silts sits slit slits slots soloist soloists soot sot sots still stills stilt stilts stool stools stoss til till tills tilt tilts titi titis titlist titlists toil toils toll tolls tools toot toots toss tot tots","niosw":"inn noon now onion own snow soon win won|inion inns ion ions ninon nisi non noons owns sin sins snows son sons sown swoon swoons winnow winnows wino winos wins","omprt":"moo mop pop pot room root rot too top|mom moor moot mort mot motmot motor motto opp opt ort otto pom pomp pompom poor port potoroo potto pro prom promo prompt prop propr rom romp roo rotor tom toot tor torpor torr tort tot tromp troop trot","eabdg":"age badge bead bed bee beg edge egg|abbe adage agee babe bade baggage bagged bedded begged dabbed dded dead deb debag deed deg degage ebb egad gabbed gadded gagged gee","ablnp":"all ball ban lap nap pal pan plan|aba abb abba abl ala alb alba alp ana ann anna annal app appall baa baba bal banal banana bap blab lab lablab naan nab pall palp pap papa papal","acder":"add car card care dad ear race read|acc accede ace acre adder arc arcade are area areca arr arrear cad cade cadre caracara carder career carer ceca cedar dace dada dare darer dead dear decade decare dread drear era racer rad radar rare reader rear reread","tacno":"ant cat coat cot not tan ton too|acct act anat anatto annatto anta att attn cannot cant cantata canto canton coact concoct cont contact conto coot cotta cotton ctn natant oat oct octan octant onto otto taco tact tana tanto tat tattoo toccata toot tot","daflo":"add dad doll fold food load odd old|ado aldol dada dado daff dodo doff dol doodad fad fado fld flood lad offload","dahno":"add and dad had hand hood nod odd|ado dada dado dah dodo don dona donna doodad doodah hhd hod hoodoo","adswy":"add dad day sad saw say was way|adds assay assays away dada dadas daddy daddys dads daw daws days dyad dyads sass sassy saws says sway sways wad wads waw waws ways yaw yaws","aemnr":"arm ear man mane name near ram ran|amen ana ane anear ann anna are area arena arr arrear earn earner enema era mam mama mamma mana manana manna manner mar mara mare maremma mean merman naan nae rammer ranee rare ream reamer rear rename","aflnt":"all ant fall fan fat flat tall tan|aft ala alfalfa alt ana anat ann anna annal anta atlatl att attn faff fallal fatal flan lantana lat naan naff natal natant natl tala tana tat","rafmo":"arm far farm from ram roar roof room|afar armor aroma arr faro for fora form fro mar mara mfr moor mora oar ora raff roam rom roo","oaglt":"ago goal goat got log lot too tool|agog allot alto atoll galloot galoot gloat glottal goa goo googol gotta logo loll loo loot lota lotto oat olla otto tattoo tog toga tola toll toot tot total","pails":"lap lip pail pal pass pip sip slip|alp alps aplasia aplasias app appall appalls apps apsis asap asp asps laps lips lisp lisps pails paisa paisas palais pall pallia palls palp pals pap papa papal papas papilla paps pili pill pills pips psi psia psis salpa salpas sap saps sips slap slaps slips spa spall spas spill spills spp","lakow":"all koala look low owl walk wall wool|ala alk allow alow awl kola kolo law loll loo olla wallow","almrt":"all arm art llama mat ram rat tall|ala alar alarm alt altar amt arr atlatl atm att attar lam lama lar lat malar mall malm malt mam mama mamma mammal mar mara marl mart rall rata ratal tala tam tar tartar tat tram","anstw":"ant ants sat saw swan tan want was|ana anas anat ann anna annas anta assn asst att attn awn awns naan naans natant sans sass saws stat statant stats swans swat swats tana tans tass tat tats taw taws twas twats wan wanna wants wast wat watt watts waw waws","ebdfw":"bed bee dew fed fee feed few web|bedded bedew beef dded deb deed def dweeb ebb eff ewe webbed wed wedded wee weed","obdgw":"bog boo bow dog good odd wood wow|bob bod bowwow dob dodo doggo dogwood dow gob gobo god goo obb wog woo","ibdmr":"bib bird did dim mid rib rid rim|bibb bid birr brim dib dir ibid iii midi midrib mim mir","obdty":"body boo boot boy dot odd too toy|bob bobby bod booty bot bott dob dobby dodo dotty obb obdt otto tod toddy tody toot tot toyboy yob yobbo yod","ebgty":"bee beg bet bye egg eye get yet|beet beget bey byte ebb gee gey tee yegg","ibgnr":"bib big bin bring grin inn rib ring|bibb biggin binning birr brig gib gibing gig gigging ginning grig grigri grinning ign iii inning nib ribbing rig rigging ringing","obgrt":"bog boo boot got robot root rot too|bob boor bor borg bort bot bott bro gob gobo goo gro grog grot grotto obb orb org ort otto rob roo rotor tog toot tor torr tort tot trot","ocdhw":"cod cow hood how odd who wood wow|choc chow chowchow coco coho coo dhow doc dodo dow hoc hod hoo hooch hoodoo och oho ooh woo","defgo":"doe dog edge fed feed food good odd|dded deed def deg dodge dodo doff doge dogged doggo eddo fogdog fogged geod geode god ode","edfhr":"fed fee feed free her herd here red|dded deed deer def deferred deferrer deffer der dree edh eff ere err feeder heder heed heeded herder redd rede reed reef reefer ref refer referee referred referrer reffed","idlnw":"did din inn lid wild will win wind|dill iii ill ind lii lin linin linn nil","efgly":"egg elf eye fee feel fell leg yell|eel eff elegy ell felly fey flee fley gee gel gey glee gley lee leggy ley lye yegg","efmnt":"fee feet meet men met net ten tent|eff effete eft emf emmet entente fem feme femme fen fete mem meme mene mete mneme nee tee teem teen tenement tenet tenne","efsty":"eye fee feet see set test yes yet|eff effete effs eft efts esse eyes fees fess fesses fest fests fete fetes fey sees sestet sestets sets sett settee settees setts stet stets tee tees testee testees testes tests testy tsetse tsetses yeses yest","eglnt":"egg get leg let net tell ten tent|eel ell eng enl entente gee gel gene genet gent genteel gentle glee gleet glen lee leet lent nee neg nettle tee teen tel teleg telnet tenet tenge tenne","oehmp":"home hoop hop hope moo mop poem pop|emo hoo hoopoe memo mho mom mope ohm oho ooh oomph ope opp pho pom pome pomp pompom pooh pope","oelmn":"lemon melon mole moo moon none noon one|emo enol eon leno leone loll lone loo loom loon memo mol moll mom mon mono neon noel nolo nom non oenomel ole oleo omen","leosw":"less lose low owl sell slow well wool|eel eels ell ells else lee lees lessee lessees lesses loess loll lolls loo loos loose looses losel loses loss losses lossless lows ole oleo oles owls seel seels sells sewellel slew slews sloe sloes slows sol sole soles solo solos sols swell swells wells wools","oeptw":"pop pot toe too top tow two wow|ope opp opt otto owe poet pope poppet potto pow powwow toot tope topee tot tote woe woo wot","iflpt":"fit flip lift lip lit pip pit tip|fill fillip flit iii ill lii lilt pili pill pipit tiff til till tilt titi","oghnw":"hog how noon now own who won wow|gong goo goon gown hon hong hoo nog nohow non oho ooh wog woo","ihmst":"him his hit its miss mist sit this|hims hiss hist hits iii imit ism isms mim mishit mishits mists mitis mitt mitts shim shims shits sim sims sis sits smith smiths titi titis","oklrt":"look lot roll root rot too took tool|kolo kook kor koto loll loo loot lotto ort otto roo rook rotl rotor toll toot tor torr tort tot troll trot","olnty":"lot noon not only ton too tool toy|loll lolly loo loon loony loot lotto nolo non nylon onto otto toll tolly tolyl tony toot tot yon","torsy":"root rot sort story too toy toys try|ort orts otto roost roosts roots rotor rotors rots soot sooty sorts sot sots stor storys stoss str stroy sty stys syst toot toots tootsy tootsys tor torr torrs tors torso torsos tort torts toss tot tots trot trots troy troys trys tryst trysts ttys tyro tyros","abcdl":"add all bad ball cab call dad|aba abaca abb abba abl acc ala alb alba baa baba bal bald ballad blab cabal cad cal calla clad dab dada lab lablab lac lad","abcnr":"ban barn cab can car crab ran|aba abaca abb abba abbr abr acc ana ann anna arb arc arcana arr baa baba banana banc bar barb barranca bra bran cabana canc cancan canna caracara carbarn naan nab narc","dabhi":"add aid bad dad did had hid|bid dab dada dah dib hhd ibid","abdpt":"add bad bat dad pad pat tap|aba abb abba adapt app apt att baa baba bap batt dab dada dap dat data pap papa tab tad tat","eabkp":"ape bake beak bee keep pea peak|abbe akee apeak babe beep ebb eek eke epee kea kebab keek kep peba peek peep peke pep","acehp":"ape cap cape each heap pea peach|aah acc ace ache aha apace apache app cache ceca cha chap chape cheap ephah hae hap pace pacha pah pap papa peace","dagil":"add aid dad did dig glad lid|algid dada dag diag dial dill gad gadid gid gild lad laid","daikp":"add aid dad did dip kid pad|dada dak dap dpi kadi paid ppd","damot":"add dad dot mad mood odd toad|ado dada dado dat data dato dodo dom doodad doom madam mod tad tod","eafrs":"ear ears fee free safe sea see|are area areas ares arrases arrear arrears asses assess assesses ease eases eff effs era eras erase eraser erases ere err errs esse fare fares fear fears fees fess fesses frae frees rare rares rear rears reef reefer reefs ref refer referee referees referrer refs safes sasses seafarer sear sears seas seer seeress sees sere serf serfs","eaktw":"ate eat take tea wake week wet|akee awake awe eek eke eta ewe kea keek teak tee tweak twee tweet weak wee weka","paeny":"ape nap pan pay pea pen penny|apnea app epee nape nappe nappy neap paean pane panne pap papa papaya pappy payee pean peen peep penna penne pep peppy pya pye yap yappy yep","tafop":"fat foot pat pot tap too top|afoot aft apt atop att ftp oat oft opt otto potato potto tat tattoo toff toft toot tot","pagit":"gap pat pig pip pit tap tip|app apt pap papa pipit pita pitapat pitta ptg","aglpw":"all gap lap pal paw wag wall|aga ala alg alga algal alp app appall awl gag gaga gal gala gall gawp lag law pall palp pap papa papal pawl pawpaw plagal waw","ahmny":"any ham hay man many may yam|aah aha amah ana ann anna ayah hammy mam mama mamma mammy mana manana manna maya myna naan nah nanny nay yah","ahpsy":"ash happy has hay pass pay say|aah aha app apps asap ashy asp asps assay assays ayah ayahs hap hash hasp hasps hays hypha pah pap papa papas papaya papayas pappy pappys paps pash pasha pashas pays pya pyas sap sappy saps sash sashay sashays sass sassy says shah shahs shay shays spa spas spay spays yah yap yappy yaps","aimpr":"aim air arm map pair ram ramp|ami amimia amp app arapaima aria arr imam impair maim mam mama mamma mar mara maria pam pampa pap papa par para parr pram rap ria","oamnw":"moo moon noon now own won wow|ammo anoa anon mammon moa moan mom mon mono mow nom noma non woman woo","bcetu":"bee bet but cub cube tub tube|beet bub butte butut cubeb ebb","obckt":"boo book boot cook cot too took|bob bock bot bott cob coco coo cookbook coot kob kobo kook koto obb oct otto toot tot","ebdhs":"bed bee bees see seed she shed|bedded beds dded deb debs deed ebb ebbs edh esse heed heeded heeds seedbed seedbeds seeded seeds sees sheds shes","ubdgm":"bud bug dug gum mud mug mum|bub dub dud dumb dumdum muumuu","ibdnt":"bib bin bit did din inn tin|bibb bid bind bitt dib dint dit ibid iii ind init innit int inti nib nit nitid tidbit tint titi","eblwy":"bee bell bye eye web well yell|bel belle belly bey bleb blew ebb eel ell ewe lee ley lye webby wee welly yew","ubfnr":"bun burn fun fur nun rub run|bub buff bur burr furfur furn nub ruff urn","ibknp":"bib bin ink inn pin pink pip|bibb bikini iii kin kinin kink kip nib pipkin pippin","ubmpt":"bump but mum pump pup put tub|bub butut mump mut mutt muumuu pub putt tum tut tutu ump","icdep":"dice did dip ice pie pip pipe|cedi decide decided deicide die dipped dpi eide epic iii pic pice piece pipped","ocdet":"cod cot doe dot odd toe too|coco cocotte codded code coed coo cooee coot cote deco decoct doc dodo dote dotted eddo oct octet ode otto tod toot tot tote totted","ocdgm":"cod cog dog good moo mood odd|coco com comdg comm coo coom doc dodo doggo dom doom god goo mod mog mom","ocdnr":"cod corn door nod noon odd rod|coco cocoon codon con concord condo condor conn coo cor cord cordon corr croon doc dodo don donor dor non nor odor orc ord ordn ordo roc rococo rondo roo rood","ocgpt":"cog cot got pop pot too top|coco coo coop coot cop goo goop oct opp opt otto poco pogo potto tog toot topog tot","pchio":"chip chop hip hoop hop pip pop|coop cop hiphop hippo opp phi pho pic poco poi pooch pooh","ickpt":"kick kit pick pip pit tick tip|cit iii kip pic pipit tic tiki titi","edgmn":"den edge egg end gem men need|dded deed deem deg deme emend eng gee gene genned meed meg mem meme mend mended mene mneme nee needed neg","edgsu":"due edge egg eggs see seed use|dded deed deg dude dudes dues edges esse gee gees geese guess guesses sedge sedges seeded seeds sees segue segues sue suede sues susses used uses","edist":"see seed set side test tide tie|dded deed deist deists desist desists detest die dies diesis diet diets dissed disses edit edited edits eide esse ides issei seeded seeds sees seise sestet sestets sets sett settee settees setts sides sises site sites steed steeds stet stets stetted ted teds tee tees tested testee testees testes testis tests tides ties tsetse tsetses"};
+var SETS=Object.keys(GARDEN).sort();
+var gardenPuz={id:'garden',name:'Word garden',
+  open:function(stage,p){
+    var g=G,st=p.st;
+    if(!st){
+      var key=SETS[perm(SETS.length,1234)[p.n%SETS.length]],cm=GARDEN[key].split('|')[0].split(' ');
+      st=p.st={set:key,goal:Math.min([0,3,3,4,5,6][S.diff],cm.length-1),found:[],done:false};
+    }
+    var set=st.set,mid=set.charAt(0),parts=GARDEN[set].split('|'),common=parts[0].split(' '),words=common.concat(parts[1]?parts[1].split(' '):[]);
+    var GOAL=st.goal,cur='';
+    stage.classList.add('top');
+    var found=h('div',{class:'found'}),msg=note(),letters=h('div',{class:'gl'});
+    var inp=typeBox({max:8,allow:set,label:'Type a word',onChange:function(v){cur=v;msg.textContent='';},onEnter:check});
+    function paint(){
+      found.innerHTML='';
+      st.found.forEach(function(x){found.appendChild(h('span',{text:x}));});
+      for(var i=st.found.length;i<GOAL;i++)found.appendChild(h('span',{class:'todo',text:'.'}));
+    }
+    function check(){
+      if(G!==g||st.done)return;
+      var bad='';
+      if(cur.length<3)bad='Make it three letters or more.';
+      else if(cur.indexOf(mid)<0)bad='Use the yellow letter too.';
+      else if(st.found.indexOf(cur)>=0)bad='You have that one already.';
+      else if(words.indexOf(cur)<0)bad='That is not a word I know.';
+      if(bad){msg.textContent=bad;sfx('soft');inp.setValue('');return;}
+      st.found.push(cur);say(cur);msg.textContent='';inp.setValue('');
+      if(st.found.length>=GOAL)st.done=true;
+      save();paint();
+      if(st.done)setTimeout(function(){if(G===g)finish();},1100);else sfx('good');
+    }
+    var acts=actKeys(function(){if(G!==g||st.done)return;inp.setValue(cur.slice(0,-1));},check);
+    function finish(){
+      letters.style.display=acts.style.display=inp.style.display='none';inp.blur();
+      var more=common.filter(function(x){return st.found.indexOf(x)<0;}).slice(0,6);
+      msg.textContent=more.length?'Other words you could make: '+more.join(', ')+'.':'';
+      setPrompt('Brilliant! You made '+GOAL+' words.');sfx('win');
+      puzzleDone(gardenPuz,stage);
+    }
+    var order=sshuffle(set.slice(1).split(''),seeded(p.n+7));
+    [order[0],order[1],mid,order[2],order[3]].forEach(function(l){
+      var b=h('button',{class:'block ltile'+(l===mid?' mid':''),type:'button',text:l});
+      b.addEventListener('click',function(){
+        if(G!==g||st.done||cur.length>=8)return;
+        inp.setValue(cur+l);sfx('tick');
+      });
+      letters.appendChild(b);
+    });
+    stage.appendChild(found);stage.appendChild(inp);stage.appendChild(msg);stage.appendChild(letters);stage.appendChild(acts);
+    paint();
+    setPrompt('Make '+GOAL+' words. Always use '+mid+'.');
+  }
+};
+var PUZZLES=[wordPuz,sortPuz,gardenPuz];
+
+/* ---------- screens ---------- */
+function holdButton(label,onOpen){
+  var b=h('button',{class:'hold',type:'button'},[h('i'),h('b',{text:label})]),t=null;
+  function stop(){clearTimeout(t);t=null;b.classList.remove('going');}
+  function start(e){if(e)e.preventDefault();if(t)return;b.classList.add('going');t=setTimeout(function(){stop();onOpen();},3000);}
+  b.addEventListener('pointerdown',start);
+  b.addEventListener('pointerup',stop);b.addEventListener('pointerleave',stop);b.addEventListener('pointercancel',stop);
+  b.addEventListener('contextmenu',function(e){e.preventDefault();});
+  b.addEventListener('keydown',function(e){if((e.key==='Enter'||e.key===' ')&&!e.repeat)start(e);});
+  b.addEventListener('keyup',stop);
+  return b;
+}
+function tileIcon(id){
+  if(id==='count')return h('span',{class:'ico',text:'1 2 3'});
+  if(id==='letters')return h('span',{class:'ico',text:'a b c'});
+  if(id==='moles')return h('span',{class:'ico molei','aria-hidden':'true',html:moleSvg('mole')});
+  var svg={
+    shapes:'<svg viewBox="0 0 100 100"><polygon points="50,8 94,88 6,88" fill="#fff"/></svg><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="42" fill="#fff"/></svg>',
+    next:'<svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="40" fill="#fff"/></svg><svg viewBox="0 0 100 100"><rect x="12" y="12" width="76" height="76" rx="8" fill="#fff"/></svg><svg viewBox="0 0 100 100"><circle cx="50" cy="50" r="38" fill="none" stroke="#fff" stroke-width="8" stroke-dasharray="14 12"/></svg>',
+    pairs:'<svg viewBox="0 0 100 100"><rect x="14" y="6" width="72" height="88" rx="12" fill="#fff"/></svg><svg viewBox="0 0 100 100"><rect x="14" y="6" width="72" height="88" rx="12" fill="#fff"/></svg>',
+    music:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="6" y="8" width="22" height="84" rx="8"/><rect x="39" y="20" width="22" height="72" rx="8"/><rect x="72" y="34" width="22" height="58" rx="8"/></g></svg>',
+    copy:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="4" y="4" width="42" height="42" rx="8"/><rect x="54" y="54" width="42" height="42" rx="8"/><rect x="54" y="4" width="42" height="42" rx="8" opacity=".35"/><rect x="4" y="54" width="42" height="42" rx="8" opacity=".35"/></g></svg>',
+    lights:'<svg viewBox="0 0 100 100"><g fill="#fff"><path d="M46 46 H6 A40 40 0 0 1 46 6Z"/><path d="M54 46 V6 A40 40 0 0 1 94 46Z" opacity=".45"/><path d="M46 54 V94 A40 40 0 0 1 6 54Z" opacity=".45"/><path d="M54 54 H94 A40 40 0 0 1 54 94Z" opacity=".45"/></g></svg>',
+    bricks:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="4" y="8" width="28" height="12" rx="3"/><rect x="36" y="8" width="28" height="12" rx="3"/><rect x="68" y="8" width="28" height="12" rx="3" opacity=".45"/><rect x="20" y="24" width="28" height="12" rx="3" opacity=".45"/><rect x="52" y="24" width="28" height="12" rx="3"/><circle cx="60" cy="62" r="7"/><rect x="26" y="84" width="48" height="9" rx="4.5"/></g></svg>'
+  };
+  return h('span',{class:'ico','aria-hidden':'true',html:svg[id]});
+}
+function home(){
+  screen='home';G=null;hush();
+  $app.innerHTML='';
+  var tiles=h('div',{class:'tiles'});
+  GAMES.forEach(function(d){
+    var b=h('button',{class:'block tile',type:'button',style:'--c:var(--'+d.c+');--cd:var(--'+d.c+'-d)'},[tileIcon(d.id),h('span',{class:'nm',text:d.name})]);
+    b.addEventListener('click',function(){sfx('tick');startGame(d);});
+    tiles.appendChild(b);
+  });
+  var tod=h('div',{class:'today'});
+  var PICO={word:['green','yellow','line'],sort:['blue','purple','pink'],garden:['line','yellow','line']};
+  PUZZLES.forEach(function(d){
+    var n=solvedToday(d.id);
+    var ico=h('span',{class:'ico','aria-hidden':'true'},PICO[d.id].map(function(c){return h('i',{style:'background:var(--'+c+')'});}));
+    var b=h('button',{class:'block dtile',type:'button'},[ico,h('span',{class:'nm',text:d.name}),n?h('span',{class:'tick',text:'✓ '+n}):null]);
+    b.addEventListener('click',function(){sfx('tick');startPuzzle(d);});
+    tod.appendChild(b);
+  });
+  $app.appendChild(h('div',{class:'home'},[
+    h('h1',{html:'Little <span>Sparks</span>'}),
+    h('p',{class:'lbl',text:'Puzzles'}),
+    tod,
+    h('p',{class:'lbl',text:'Games'}),
+    tiles,
+    h('div',{class:'homefoot'},[holdButton('Grown-ups: hold for 3 seconds',parent)])
+  ]));
+}
+function adapt(g){
+  var id=g.def.id;
+  if(S.adapt){
+    var off=S.off[id]||0;
+    if(g.mistakes<=1){
+      S.streak[id]=(S.streak[id]||0)+1;
+      if(S.streak[id]>=2&&off<1){S.off[id]=off+1;S.streak[id]=0;}
+    }else{
+      S.streak[id]=0;
+      if(g.mistakes>=Math.max(4,g.total)&&off>-1)S.off[id]=off-1;
+    }
+  }
+}
+function roundEnd(){
+  var g=G;
+  if(g.def.id!=='moles')adapt(g);
+  save();
+  if(limitReached())return allDone();
+  screen='end';G=null;
+  $app.innerHTML='';
+  var title=g.endTitle||'Well done!';
+  sfx('win');say(title);
+  var again=h('button',{class:'block go alt',type:'button',text:'Play again'});
+  again.addEventListener('click',function(){startGame(g.def);});
+  $app.appendChild(h('div',{class:'end'},[
+    h('div',{class:'big',text:g.endIcon||'⭐'}),h('h2',{text:title}),
+    g.endNote?h('p',{text:g.endNote}):null,
+    h('div',{class:'endbtns'},[homeButton(),again])
+  ]));
+}
+function allDone(){
+  screen='done';G=null;save();
+  $app.innerHTML='';
+  say('All done for today. Time to play something else.');
+  $app.appendChild(h('div',{class:'end'},[
+    h('div',{class:'big',text:'🌙'}),h('h2',{text:'All done for today'}),
+    h('p',{text:'Time to play something else.'}),
+    holdButton('Grown-ups: hold for 3 seconds',parent)
+  ]));
+}
+function segRow(label,opts,current,onPick){
+  var seg=h('div',{class:'seg',role:'group','aria-label':label});
+  opts.forEach(function(o){
+    var b=h('button',{type:'button',class:'segb'+(o[0]===current?' on':''),text:o[1]});
+    if(o[0]===current)b.setAttribute('aria-pressed','true');
+    b.addEventListener('click',function(){onPick(o[0]);save();applyTheme();parent();});
+    seg.appendChild(b);
+  });
+  return h('div',{class:'prow'},[h('span',{class:'plabel',text:label}),seg]);
+}
+function voiceStatus(){
+  if(!HAS_TTS)return'This browser has no speech engine, so questions cannot be read aloud here.';
+  var vs=voiceList();
+  if(voiceOK===false)return'The last test did not start. Check the volume, then try again.';
+  if(!vs.length)return'No voices found yet. Tap Test voice.';
+  return vs.length+' voice'+(vs.length>1?'s':'')+' found'+(VOICE?'. Using '+VOICE.name+'.':'.');
+}
+function parent(){
+  var keep=screen==='parent'&&$app.firstChild?$app.firstChild.scrollTop:0;
+  screen='parent';G=null;rollDay();hush();
+  $app.innerHTML='';
+  var w=h('div',{class:'parent'});
+  w.appendChild(h('h2',{text:'Grown-ups'}));
+  w.appendChild(h('h3',{text:'Difficulty'}));
+  w.appendChild(h('p',{text:'One setting drives every game and puzzle. Puzzles use the new level from the next one she opens.'}));
+  w.appendChild(segRow('All games',[1,2,3,4,5].map(function(v){return[v,v+' '+DIFFNAME[v]];}),S.diff,function(v){S.diff=v;S.off={};S.streak={};}));
+  w.appendChild(segRow('Fine-tune each game',[[true,'On'],[false,'Off']],S.adapt,function(v){S.adapt=v;}));
+  w.appendChild(h('p',{text:'With fine-tune on, a game steps up one level after two rounds with at most one slip, and down one after a hard round. Right now: '+
+    GAMES.map(function(d){return d.name+' '+levelOf(d.id);}).join(', ')+'.'}));
+  w.appendChild(h('h3',{text:'Play time'}));
+  var mins=Math.floor(S.used/60);
+  w.appendChild(h('p',{text:'Played today: '+mins+' min. Every game and puzzle can be played as often as she likes until the limit. Then the current round finishes and everything closes for the day.'}));
+  w.appendChild(segRow('Daily limit',[[0,'Off'],[10,'10 min'],[15,'15 min'],[20,'20 min'],[30,'30 min'],[45,'45 min']],S.limit,function(v){S.limit=v;}));
+  w.appendChild(segRow('Extra time today',[[S.bonus,(S.bonus/60)+' min added'],[S.bonus+600,'Add 10 min']],S.bonus,function(v){S.bonus=v;}));
+  w.appendChild(h('h3',{text:'Screen'}));
+  w.appendChild(segRow('Colours',[['dark','Dark'],['light','Light']],S.theme,function(v){S.theme=v;}));
+  w.appendChild(segRow('Warm night light',[[true,'On'],[false,'Off']],S.warm,function(v){S.warm=v;}));
+  w.appendChild(h('h3',{text:'Sound'}));
+  w.appendChild(segRow('Read questions aloud',[[true,'On'],[false,'Off']],S.voice,function(v){S.voice=v;}));
+  w.appendChild(segRow('Sound effects',[[true,'On'],[false,'Off']],S.sfx,function(v){S.sfx=v;}));
+  var stat=h('p',{class:'pstat',text:voiceStatus()});
+  var test=h('button',{class:'segb',type:'button',text:'Test voice'});
+  test.addEventListener('click',function(){
+    say('Hello! I will read the questions out loud.',true);
+    setTimeout(function(){if(screen==='parent')stat.textContent=voiceStatus();},3200);
+  });
+  w.appendChild(h('div',{class:'prow'},[h('span',{class:'plabel',text:'Voice check'}),test,stat]));
+  w.appendChild(h('p',{text:'The speaker button in every game reads the question again, even when reading aloud is off.'}));
+  var B=S.best||{},bl=[1,2,3,4,5].filter(function(l){return B[l];}).map(function(l){return'level '+l+': '+B[l];});
+  w.appendChild(h('h3',{text:'Mole pop best scores'}));
+  w.appendChild(h('p',{text:bl.length?bl.join(', ')+'.':'No scores yet.'}));
+  var back=h('button',{class:'block go',type:'button',text:'Back to the games'});
+  back.addEventListener('click',home);
+  w.appendChild(back);
+  $app.appendChild(w);
+  w.scrollTop=keep;
+}
+function applyTheme(){
+  document.documentElement.setAttribute('data-mode',S.theme==='light'?'light':'dark');
+  var wm=document.getElementById('warm');if(wm)wm.style.display=S.warm?'block':'none';
+}
+
+applyTheme();
+home();
+/* installed app: work offline, and ask the browser to keep her progress */
+try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');}catch(e){}
+try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
+})();
+</script>
+</body>
+</html>
