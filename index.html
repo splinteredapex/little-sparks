@@ -306,6 +306,35 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+/* landscape tablet layouts */
+@media (orientation:landscape){
+  .stage.molest.top{flex-direction:row;justify-content:center;align-items:center;gap:5vmin}
+  .stage.molest .mhud{flex-direction:column;width:auto;gap:14px}
+  .stage.molest .tbar{flex:none;width:20px;height:min(42vh,280px);border-radius:10px}
+  .stage.molest .tbar i{transform-origin:center bottom;transform:scaleY(var(--t,1))}
+  .stage.molest .hole{--h:min(170px,calc((100vh - 230px)/3))}
+}
+
+.wlay{display:flex;gap:28px;align-items:center;justify-content:center;flex-wrap:wrap}
+.wside{display:flex;flex-direction:column;gap:14px;align-items:center;max-width:260px}
+.wside .endbtns{flex-direction:column;align-items:center}
+.glay{display:flex;gap:4vmin;align-items:center;justify-content:center;flex-wrap:wrap;width:100%}
+.gcol{display:flex;flex-direction:column;gap:14px;align-items:center;min-width:min(100%,340px)}
+.fwrap{position:relative}
+.fwrap>.go{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5}
+.fwrap>.go:active{transform:translate(-50%,calc(-50% + 6px))}
+@media (orientation:landscape){
+  .sgrid.c4{grid-template-columns:repeat(var(--lc),auto)}
+  .c4 .stile{width:min(18vmin,136px,calc((100vw - 60px)/var(--lc) - 12px));height:min(18vmin,136px,calc((100vw - 60px)/var(--lc) - 12px))}
+}
+@media (max-height:460px){
+  .rbtn{width:40px;height:40px}.rbtn svg{width:20px;height:20px}
+  .bar{padding:4px 10px 0}.dots{display:none}
+  .prompt{font-size:18px}
+  .stage{padding-top:4px;padding-bottom:8px;gap:8px}
+  .gl .ltile{width:min(13vmin,64px);height:min(13vmin,64px);font-size:min(9vmin,40px)}
+}
+
 .edgeback{position:fixed;left:8px;top:40%;width:56px;height:56px;border-radius:50%;background:var(--paper);color:var(--ink);display:grid;place-items:center;box-shadow:0 6px 16px rgba(0,0,0,.35);z-index:60;opacity:0;transform:translateX(-70px);pointer-events:none}
 .edgeback svg{width:28px;height:28px}
 .edgeback.ready{background:var(--blue);color:#fff}
@@ -356,9 +385,9 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .msc{font-family:var(--display);font-weight:600;font-size:clamp(28px,6vmin,48px);min-width:2em;text-align:center}
 .mbest{color:var(--muted);font-size:clamp(15px,3vmin,22px);white-space:nowrap}
 .tbar{flex:1;height:18px;border-radius:9px;background:var(--cell);overflow:hidden}
-.tbar i{display:block;height:100%;width:100%;background:var(--green);transform-origin:left center;transition:transform .1s linear}
-.field{display:grid;grid-template-columns:repeat(3,auto);gap:min(3vmin,22px);padding:min(3.5vmin,24px);border-radius:28px;background:var(--grass);box-shadow:0 8px 0 var(--edge)}
-.hole{position:relative;width:min(24vmin,170px);height:min(24vmin,170px);cursor:pointer;touch-action:none}
+.tbar i{display:block;height:100%;width:100%;background:var(--green);transform-origin:left center;transform:scaleX(var(--t,1));transition:transform .1s linear}
+.field{display:grid;grid-template-columns:repeat(3,auto);gap:min(2.5vmin,18px);padding:min(3vmin,20px);border-radius:28px;background:var(--grass);box-shadow:0 8px 0 var(--edge)}
+.hole{--h:min(24vmin,170px,calc((100vh - 330px)/3));position:relative;width:var(--h);height:var(--h);cursor:pointer;touch-action:none}
 .hole .pit{position:absolute;left:6%;right:6%;bottom:10%;height:24%;border-radius:50%;background:#1d130d}
 .hole .win2{position:absolute;left:14%;right:14%;top:0;bottom:22%;overflow:hidden}
 .hole .crit{position:absolute;left:0;right:0;bottom:0;height:100%;transform:translateY(105%);transition:transform .12s ease-out}
@@ -1378,7 +1407,7 @@ var moleGame={id:'moles',name:'Mole pop',c:'lime',
     S.best=S.best||{};
     var best=S.best[level]||0,score=0,running=false,endAt=0,holes=[],timers=[],tick=null;
     setPrompt(hogP?'Tap the moles. Leave the hedgehogs alone!':'Tap the moles as fast as you can!');
-    stage.classList.add('top');
+    stage.classList.add('top','molest');
     var sc=h('span',{class:'msc',text:'0'}),bar=h('i'),bestEl=h('span',{class:'mbest',text:best?'Best '+best:'No best yet'});
     var hud=h('div',{class:'mhud'},[sc,h('div',{class:'tbar'},[bar]),bestEl]);
     var field=h('div',{class:'field'});
@@ -1391,7 +1420,7 @@ var moleGame={id:'moles',name:'Mole pop',c:'lime',
     })(i);
     var go=h('button',{class:'block go',type:'button',text:'Start'});
     go.addEventListener('click',begin);
-    stage.appendChild(hud);stage.appendChild(field);stage.appendChild(go);
+    stage.appendChild(hud);stage.appendChild(h('div',{class:'fwrap'},[field,go]));
     function later(fn,ms){var t=setTimeout(function(){if(G===g)fn();},ms);timers.push(t);return t;}
     function down(H2){H2.up=false;H2.hit=false;H2.el.classList.remove('up','hit','hog');}
     function spawn(){
@@ -1424,7 +1453,7 @@ var moleGame={id:'moles',name:'Mole pop',c:'lime',
       tick=setInterval(function(){
         if(G!==g){clearInterval(tick);return;}
         var left=Math.max(0,endAt-Date.now());
-        bar.style.transform='scaleX('+(left/DUR)+')';
+        bar.style.setProperty('--t',String(left/DUR));
         if(left<6000)bar.style.background='var(--red)';
         if(left<=0)finish();
       },100);
@@ -1649,13 +1678,13 @@ function startPuzzle(def){
   def.open(stageEl,puz(def.id));
   save();
 }
-function puzzleDone(def,stage){
+function puzzleDone(def,stage,into){
   markSolved(def.id);save();
   var nx=h('button',{class:'block go',type:'button',text:'Next puzzle'});
   nx.addEventListener('click',function(){startPuzzle(def);});
   var hm=h('button',{class:'block go alt',type:'button',text:'Choose a game'});
   hm.addEventListener('click',home);
-  stage.appendChild(h('div',{class:'endbtns'},[nx,hm]));
+  (into||stage).appendChild(h('div',{class:'endbtns'},[nx,hm]));
 }
 function note(text){return h('p',{class:'note',text:text||''});}
 function actKeys(onDel,onGo){
@@ -1721,7 +1750,7 @@ var wordPuz={id:'word',name:'Guess the word',
     function fit(){
       if(G!==g)return;
       var vv=window.visualViewport,vh=vv?vv.height:window.innerHeight,off=vv?vv.offsetTop:0;
-      var top=board.getBoundingClientRect().top-off,availH=vh-top-12,availW=stage.clientWidth-20,gap=6;
+      var land=window.innerWidth>window.innerHeight*1.15,top=board.getBoundingClientRect().top-off,availH=vh-top-26,availW=stage.clientWidth-20-(land?260:0),gap=6;
       var size=Math.floor(Math.min((availW-gap*(L-1))/L,(availH-gap*(TRIES-1))/TRIES,68));
       board.style.setProperty('--c',Math.max(26,size)+'px');
     }
@@ -1752,7 +1781,7 @@ var wordPuz={id:'word',name:'Guess the word',
       setPrompt(st.won?'You got it! The word is '+word+'.':'The word was '+word+'.');
       if(st.won)sfx('win');
       stage.classList.remove('tight');
-      puzzleDone(wordPuz,stage);
+      puzzleDone(wordPuz,stage,side);
     }
     function clue(){
       if(st.done||st.shown||st.g.length<st.clue||extra.firstChild)return;
@@ -1762,7 +1791,8 @@ var wordPuz={id:'word',name:'Guess the word',
     }
     var check=h('button',{class:'block go',type:'button',text:'Check'});
     check.addEventListener('click',submit);
-    stage.appendChild(wrap);stage.appendChild(msg);stage.appendChild(h('div',{class:'endbtns'},[check,extra]));
+    var side=h('div',{class:'wside'},[msg,h('div',{class:'endbtns'},[check,extra])]);
+    stage.appendChild(h('div',{class:'wlay'},[wrap,side]));
     paint();
     setPrompt(promptText(),'Guess the word. It has '+L+' letters.');
     clue();
@@ -1794,7 +1824,7 @@ var sortPuz={id:'sort',name:'Sort it',
     var K=st.k,M=st.m,r=seeded(st.seed),cats=sshuffle(CATS,r).slice(0,K),tiles=[];
     cats.forEach(function(c,ci){sshuffle(c[1],r).slice(0,M).forEach(function(e){tiles.push({e:e,c:ci});});});
     tiles=sshuffle(tiles,r);
-    var bands=h('div',{class:'bands'}),grid=h('div',{class:'sgrid'+(K*M>9?' c4':'')}),msg=note(),sel=[],busy=false;
+    var bands=h('div',{class:'bands'}),grid=h('div',{class:'sgrid'+(K*M>9?' c4':''),style:'--lc:'+(K*M/2)}),msg=note(),sel=[],busy=false;
     function band(ci){
       bands.appendChild(h('div',{class:'band',style:'background:var(--'+BANDCOL[ci]+')'},[
         h('b',{text:cats[ci][0]}),
@@ -1894,7 +1924,7 @@ var gardenPuz={id:'garden',name:'Word garden',
       });
       letters.appendChild(b);
     });
-    stage.appendChild(found);stage.appendChild(inp);stage.appendChild(msg);stage.appendChild(letters);stage.appendChild(acts);
+    stage.appendChild(h('div',{class:'glay'},[h('div',{class:'gcol'},[found,inp,msg]),h('div',{class:'gcol'},[letters,acts])]));
     paint();
     setPrompt('Make '+GOAL+' words. Always use '+mid+'.');
   }
