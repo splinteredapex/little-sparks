@@ -1,5 +1,5 @@
 /* Little Sparks offline cache: serve from the cache straight away, refresh it in the background */
-var CACHE='little-sparks-v8';
+var CACHE='little-sparks-v9';
 var SHELL=['./','./index.html','./manifest.webmanifest','./icon-192.png','./icon-512.png','./icon-maskable.png','./apple-touch-icon.png'];
 self.addEventListener('install',function(e){
   e.waitUntil(caches.open(CACHE).then(function(c){return c.addAll(SHELL);}).then(function(){return self.skipWaiting();}));

@@ -1,0 +1,38 @@
+plugins { id 'com.android.application' }
+
+def runNumber = (System.getenv('GITHUB_RUN_NUMBER') ?: '1').toInteger()
+
+android {
+    namespace 'io.github.splinteredapex.littlesparks'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId 'io.github.splinteredapex.littlesparks'
+        minSdk 22
+        targetSdk 34
+        versionCode runNumber
+        versionName "1.0.${runNumber}"
+    }
+
+    signingConfigs {
+        // one fixed key, so each new version installs over the last and keeps her progress
+        release {
+            storeFile file('littlesparks.jks')
+            storePassword 'littlesparks-key'
+            keyAlias 'littlesparks'
+            keyPassword 'littlesparks-key'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            signingConfig signingConfigs.release
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}

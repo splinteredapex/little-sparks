@@ -534,7 +534,9 @@ function sfx(k){
 }
 /* ---------- voice: uses the device's own speech engine ---------- */
 var lastSpoken='',VOICE=null,voiceOK=null,keepU=[],earEl=null;
-var HAS_TTS=!!(window.speechSynthesis&&window.SpeechSynthesisUtterance);
+/* inside the Android app, questions are read by the tablet's own voice */
+var NATIVE=(window.LittleSparksTTS&&typeof window.LittleSparksTTS.speak==='function')?window.LittleSparksTTS:null,earT=null;
+var HAS_TTS=!!(NATIVE||(window.speechSynthesis&&window.SpeechSynthesisUtterance));
 function voiceList(){try{return window.speechSynthesis.getVoices()||[];}catch(e){return[];}}
 function pickVoice(){
   var vs=voiceList();if(!vs.length)return;
@@ -544,18 +546,18 @@ function pickVoice(){
     f(function(v){return L(v).indexOf('en')===0&&v.localService;})||f(function(v){return L(v).indexOf('en')===0;})||
     f(function(v){return v.default;})||vs[0];
 }
-if(HAS_TTS){
+if(HAS_TTS&&!NATIVE){
   pickVoice();
   try{window.speechSynthesis.addEventListener('voiceschanged',pickVoice);}catch(e){try{window.speechSynthesis.onvoiceschanged=pickVoice;}catch(x){}}
 }
 /* some browsers only allow speech after the first tap: say nothing once, silently, on that tap */
 document.addEventListener('pointerdown',function unlock(){
   document.removeEventListener('pointerdown',unlock,true);
-  if(!HAS_TTS)return;
+  if(!HAS_TTS||NATIVE)return;
   try{var u=new SpeechSynthesisUtterance(' ');u.volume=0;window.speechSynthesis.speak(u);}catch(e){}
 },true);
 function earTalk(on){if(earEl)earEl.classList.toggle('talking',!!on);}
-function hush(){try{if(HAS_TTS)window.speechSynthesis.cancel();}catch(e){}earTalk(false);}
+function hush(){try{if(NATIVE)NATIVE.stop();else if(HAS_TTS)window.speechSynthesis.cancel();}catch(e){}earTalk(false);}
 function noVoice(){
   if(!promptEl)return;
   promptEl.classList.remove('flash');void promptEl.offsetWidth;promptEl.classList.add('flash');
@@ -563,6 +565,14 @@ function noVoice(){
 function say(text,tapped){
   if(!S.voice&&!tapped)return;
   if(!HAS_TTS){if(tapped)noVoice();return;}
+  if(NATIVE){
+    try{
+      if(!NATIVE.ready()){voiceOK=false;if(tapped)noVoice();return;}
+      NATIVE.speak(text);voiceOK=true;earTalk(true);
+      clearTimeout(earT);earT=setTimeout(function(){earTalk(false);},700+text.length*75);
+    }catch(e){if(tapped)noVoice();}
+    return;
+  }
   var ss=window.speechSynthesis,started=false;
   try{
     if(!VOICE)pickVoice();
@@ -2481,6 +2491,7 @@ function segRow(label,opts,current,onPick){
   return h('div',{class:'prow'},[h('span',{class:'plabel',text:label}),seg]);
 }
 function voiceStatus(){
+  if(NATIVE){try{if(NATIVE.ready()){var vn=NATIVE.voiceName();return'Using the tablet\u2019s own voice'+(vn?' ('+vn+')':'')+'.';}}catch(e){}return'The tablet\u2019s voice is still starting. Tap Test voice in a moment.';}
   if(!HAS_TTS)return'This browser has no speech engine, so questions cannot be read aloud here.';
   var vs=voiceList();
   if(voiceOK===false)return'The last test did not start. Check the volume, then try again.';
