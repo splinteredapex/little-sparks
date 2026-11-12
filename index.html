@@ -310,6 +310,32 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+/* guess the word keyboard */
+.wlay.side{flex-wrap:nowrap}
+.wlay.side .wside{max-width:none;flex:none}
+.wlay:not(.side){flex-direction:column;gap:10px}
+.wlay:not(.side) .wside{max-width:none}
+.wkb{display:flex;flex-direction:column;gap:6px;align-items:center}
+.wkr{display:flex;gap:5px;justify-content:center}
+.wkey{width:var(--k,44px);height:calc(var(--k,44px)*1.25);padding:0;border:0;border-radius:8px;background:var(--cell);color:var(--ink);font-family:var(--body);font-weight:700;font-size:calc(var(--k,44px)*.5);cursor:pointer;box-shadow:0 3px 0 var(--edge);touch-action:none}
+.wkey.wide{width:calc(var(--k,44px)*1.5);font-size:calc(var(--k,44px)*.55);background:var(--act);color:var(--act-ink)}
+.wkey:active{transform:translateY(2px);box-shadow:0 1px 0 var(--edge)}
+.wkey.g{background:var(--green);color:#fff}
+.wkey.y{background:var(--yellow);color:#1f2a44}
+.wkey.n{background:transparent;color:var(--grey);box-shadow:none;border:2px solid var(--cell)}
+.stage.tight .wside{gap:10px}
+/* road race arrows */
+.racewrap{position:relative;flex:1;display:flex;flex-direction:column;gap:12px;width:100%;max-width:1000px;min-height:0}
+.racewrap .arena{flex:1}
+.racectl{display:flex;justify-content:space-between;gap:20px;padding:0 4px}
+.rarrow{width:min(18vmin,104px);height:min(18vmin,104px);border-radius:50%;display:grid;place-items:center;padding:0;background:var(--sky);box-shadow:0 8px 0 var(--sky-d);color:#fff;touch-action:none}
+.rarrow:active{box-shadow:0 2px 0 var(--sky-d)}
+.rarrow svg{width:55%;height:55%}
+@media (orientation:landscape){
+  .racectl{position:absolute;left:0;right:0;bottom:18px;padding:0 18px;pointer-events:none}
+  .racectl .rarrow{pointer-events:auto}
+}
+
 .sentence{margin:0;max-width:34em;text-align:center;font-size:clamp(17px,3.6vmin,26px);line-height:1.35;color:var(--ink);background:var(--paper);border-radius:16px;padding:8px 16px;animation:pop .45s}
 .sentence b{color:var(--yellow)}
 .choices.wait,.wait{pointer-events:none}
@@ -1756,10 +1782,16 @@ var raceGame={id:'race',name:'Road race',c:'sky',
   play:function(level,stage,done){
     var g=G,lanes=[0,3,3,4,4,5][level],lives=[0,5,4,4,3,3][level],speedK=[0,.3,.38,.46,.54,.62][level];
     var gapK=[0,1.9,1.6,1.35,1.15,1.0][level],carP=[0,.2,.35,.5,.6,.7][level],RACE=40;
-    setPrompt('Tap left or right to steer. Dodge the cones and cars!');
+    setPrompt('Press the arrows to steer. Dodge the cones and cars!');
     stage.classList.add('top');
     var arena=h('div',{class:'arena'}),cv=h('canvas',{'aria-label':'Racing game. Tap the left or right side to change lanes.'});
-    arena.appendChild(cv);stage.appendChild(arena);
+    arena.appendChild(cv);
+    var arrows=['left','right'].map(function(d){
+      var b=h('button',{class:'block rarrow',type:'button','aria-label':'Steer '+d,html:d==='left'?ICON.back:ICON.back.replace('<svg ','<svg style="transform:scaleX(-1)" ')});
+      b.addEventListener('pointerdown',function(e){e.preventDefault();e.stopPropagation();steer(d==='left'?-1:1);});
+      return b;
+    });
+    stage.appendChild(h('div',{class:'racewrap'},[arena,h('div',{class:'racectl'},arrows)]));
     var ctx=cv.getContext('2d'),W=0,H=0,roadX=0,roadW=0,laneW=0,total=1;
     var lane=Math.floor(lanes/2),px=0,things=[],scroll=0,dist=0,stars=0,inv=0,spawnIn=1.4,state='count',cd=3.6,said=4,last=0;
     var dark=document.documentElement.getAttribute('data-mode')!=='light';
@@ -1880,8 +1912,6 @@ var raceGame={id:'race',name:'Road race',c:'sky',
       for(var i2=0;i2<lives;i2++){ctx.fillStyle='#e0584b';ctx.beginPath();ctx.arc(18+i2*22,36,8,0,Math.PI*2);ctx.fill();}
       ctx.fillStyle='#f2e9d6';ctx.font='600 20px Fredoka, Trebuchet MS, sans-serif';ctx.textAlign='right';ctx.fillText('★ '+stars,W-14,42);
       ctx.textAlign='center';
-      ctx.fillStyle='rgba(242,233,214,.22)';ctx.font='600 '+Math.round(Math.min(W,H)*.09)+'px Fredoka, sans-serif';
-      ctx.fillText('‹',Math.max(30,roadX*.5),H*.86);ctx.fillText('›',W-Math.max(30,roadX*.5),H*.86);
       if(state==='count'){
         var n=Math.ceil(cd-.6);ctx.fillStyle='#f2e9d6';ctx.font='600 '+Math.round(Math.min(W,H)*.22)+'px Fredoka, sans-serif';
         ctx.fillText(n>=1?String(n):'Go!',W/2,H*.45);
@@ -2114,20 +2144,29 @@ var wordPuz={id:'word',name:'Guess the word',
       var list=S.diff<=2?W3:(S.diff<=4?W4:W5),pm=perm(list.length,4711+list.length),w0=list[pm[p.n%list.length]];
       st=p.st={w:w0[0],e:w0[1],clue:S.diff<=3?2:3,g:[],done:false,won:false,shown:false};
     }
-    var word=st.w,L=word.length,TRIES=6,cur='',rows=[];
+    var word=st.w,L=word.length,TRIES=6,cur='',rows=[],keyEls={};
     stage.classList.add('top','tight');
-    var board=h('div',{class:'wboard'});
-    /* an invisible text box lies over the grid: tapping the grid opens the device keyboard, letters fill the grid */
-    var inp=h('input',{class:'ghost',type:'text',autocomplete:'off',autocorrect:'off',autocapitalize:'none',spellcheck:'false',enterkeyhint:'go',inputmode:'text','aria-label':'Type your guess'});
-    var form=h('form',{class:'wform',action:'#'},[inp]);
-    var wrap=h('div',{class:'wwrap'},[board,form]);
-    var msg=note('Tap the boxes to type'),extra=h('div',{class:'show'});
+    var board=h('div',{class:'wboard'}),msg=note(''),extra=h('div',{class:'show'});
     for(var r=0;r<TRIES;r++){
       var row=h('div',{class:'wrow'}),cells=[];
       for(var c=0;c<L;c++){var cell=h('div',{class:'wcell'});cells.push(cell);row.appendChild(cell);}
       board.appendChild(row);rows.push({el:row,cells:cells});
     }
-    function promptText(){return st.shown?'Clue: '+st.e+'   Type '+L+' letters.':'Guess the word. Type '+L+' letters.';}
+    /* our own keyboard, laid out like a real one, colouring letters as she learns about them */
+    var kb=h('div',{class:'wkb'});
+    [['q','w','e','r','t','y','u','i','o','p'],['a','s','d','f','g','h','j','k','l'],['go','z','x','c','v','b','n','m','del']].forEach(function(line){
+      var kr=h('div',{class:'wkr'});
+      line.forEach(function(k){
+        var lab=k==='go'?'✓':(k==='del'?'⌫':k);
+        var b=h('button',{class:'wkey'+(k.length>1?' wide':''),type:'button','aria-label':k==='go'?'Check my word':(k==='del'?'Rub out':k),text:lab});
+        b.addEventListener('pointerdown',function(e){e.preventDefault();press(k);});
+        b.addEventListener('keydown',function(e){if(e.key==='Enter'||e.key===' '){e.preventDefault();press(k);}});
+        if(k.length===1)keyEls[k]=b;
+        kr.appendChild(b);
+      });
+      kb.appendChild(kr);
+    });
+    function promptText(){return st.shown?'Clue: '+st.e+'   Guess the '+L+' letter word.':'Guess the '+L+' letter word.';}
     function paint(){
       rows.forEach(function(R,r){
         var guess=st.g[r],sc=guess?scoreGuess(guess,word):null,live=!guess&&r===st.g.length&&!st.done;
@@ -2136,63 +2175,74 @@ var wordPuz={id:'word',name:'Guess the word',
           cell.className='wcell'+(sc?' '+sc[c]:'')+(live?' now':'')+(live&&c<cur.length?' typed':'');
         });
       });
+      var best={};
+      st.g.forEach(function(gs){scoreGuess(gs,word).forEach(function(s2,i){
+        var l=gs.charAt(i);if(s2==='g'||(s2==='y'&&best[l]!=='g')||(s2==='n'&&!best[l]))best[l]=s2;});});
+      for(var l in keyEls)keyEls[l].className='wkey'+(best[l]?' '+best[l]:'');
     }
     function fit(){
-      if(G!==g)return;
-      var vv=window.visualViewport,vh=vv?vv.height:window.innerHeight,off=vv?vv.offsetTop:0;
-      var land=window.innerWidth>window.innerHeight*1.15,top=board.getBoundingClientRect().top-off,availH=vh-top-26,availW=stage.clientWidth-20-(land?260:0),gap=6;
-      var size=Math.floor(Math.min((availW-gap*(L-1))/L,(availH-gap*(TRIES-1))/TRIES,68));
-      board.style.setProperty('--c',Math.max(26,size)+'px');
+      if(G!==g||st.done&&!kb.parentNode)return;
+      var sw=stage.clientWidth-24,sh=stage.clientHeight-20,land=sw>sh*1.25,gap=6,c,k;
+      if(land){
+        c=Math.floor(Math.min((sh-gap*(TRIES-1))/TRIES,68,(sw*.42-gap*(L-1))/L));
+        k=Math.floor(Math.min(58,(sw-(c+gap)*L-40-9*5)/10,(sh-90)/3/1.25));
+      }else{
+        k=Math.floor(Math.min(58,(sw-9*5)/10));
+        c=Math.floor(Math.min(68,(sw-gap*(L-1))/L,(sh-k*1.25*3-70-gap*(TRIES-1))/TRIES));
+      }
+      stage.style.setProperty('--c',Math.max(24,c)+'px');stage.style.setProperty('--k',Math.max(26,k)+'px');
+      lay.classList.toggle('side',land);
     }
-    function setCur(v){cur=v;if(inp.value!==v)inp.value=v;paint();}
-    inp.addEventListener('input',function(){
-      if(st.done)return;
-      setCur(inp.value.toLowerCase().replace(/[^a-z]/g,'').slice(0,L));
-      msg.textContent='';
-    });
-    function submit(){
+    function press(k){
       if(G!==g||st.done)return;
+      if(k==='del'){cur=cur.slice(0,-1);msg.textContent='';sfx('tick');paint();return;}
+      if(k==='go')return submit();
+      if(cur.length<L){cur+=k;msg.textContent='';sfx('tick');paint();}
+    }
+    function submit(){
       if(cur.length<L){
         msg.textContent='Type '+L+' letters first.';sfx('soft');
         var R=rows[st.g.length].el;R.classList.remove('shake');void R.offsetWidth;R.classList.add('shake');
-        inp.focus();return;
+        return;
       }
-      st.g.push(cur);setCur('');
+      st.g.push(cur);cur='';
       if(st.g[st.g.length-1]===word){st.done=true;st.won=true;}
       else if(st.g.length>=TRIES)st.done=true;
       save();paint();
-      if(st.done)finish();else{sfx('tick');clue();inp.focus();}
+      if(st.done)finish();else{sfx('tick');clue();}
     }
-    form.addEventListener('submit',function(e){e.preventDefault();submit();});
-    inp.addEventListener('keydown',function(e){if(e.key==='Enter'||e.keyCode===13){e.preventDefault();submit();}});
+    function key(e){
+      if(G!==g){document.removeEventListener('keydown',key);return;}
+      if(e.ctrlKey||e.metaKey||e.altKey)return;
+      if(e.key==='Enter'){e.preventDefault();press('go');}
+      else if(e.key==='Backspace'){e.preventDefault();press('del');}
+      else if(/^[a-zA-Z]$/.test(e.key)){press(e.key.toLowerCase());}
+    }
+    document.addEventListener('keydown',key);
     function finish(){
-      inp.blur();form.style.display='none';check.style.display='none';msg.textContent='';
+      kb.style.display='none';msg.textContent='';
       extra.innerHTML='';extra.appendChild(h('span',{class:'cluepic',text:st.e}));
       var ptxt=st.won?'You got it! The word is '+word+'.':'The word was '+word+'.';
       promptEl.textContent=ptxt;lastSpoken=ptxt;say(ptxt);
       if(SENT[word]){var sp=h('p',{class:'sentence'});SENT[word].split(/(\s+)/).forEach(function(tok){var b2=tok.toLowerCase().replace(/[^a-z]/g,'');sp.appendChild(b2===word?h('b',{text:tok}):document.createTextNode(tok));});side.insertBefore(sp,side.firstChild);setTimeout(function(){if(G===g)say(SENT[word]);},1800);}
       if(st.won)sfx('win');
-      stage.classList.remove('tight');
+      lay.classList.add('side');
       puzzleDone(wordPuz,stage,side);
     }
     function clue(){
       if(st.done||st.shown||st.g.length<st.clue||extra.firstChild)return;
       var b=h('button',{class:'block go alt',type:'button',text:'Show a clue'});
-      b.addEventListener('click',function(){st.shown=true;save();extra.innerHTML='';promptEl.textContent=promptText();say('Here is a clue.');inp.focus();});
+      b.addEventListener('click',function(){st.shown=true;save();extra.innerHTML='';promptEl.textContent=promptText();say('Here is a clue.');});
       extra.appendChild(b);
     }
-    var check=h('button',{class:'block go',type:'button',text:'Check'});
-    check.addEventListener('click',submit);
-    var side=h('div',{class:'wside'},[msg,h('div',{class:'endbtns'},[check,extra])]);
-    stage.appendChild(h('div',{class:'wlay'},[wrap,side]));
+    var side=h('div',{class:'wside'},[msg,extra,kb]);
+    var lay=h('div',{class:'wlay'},[board,side]);
+    stage.appendChild(lay);
     paint();
     setPrompt(promptText(),'Guess the word. It has '+L+' letters.');
-    clue();
-    fit();
-    if(window.visualViewport)window.visualViewport.addEventListener('resize',fit);
-    window.addEventListener('resize',fit);
-    inp.focus();
-    setTimeout(fit,350);
+    clue();fit();
+    function onResize(){if(G!==g){window.removeEventListener('resize',onResize);return;}fit();}
+    window.addEventListener('resize',onResize);
   }
 };
 
