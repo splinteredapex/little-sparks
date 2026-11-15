@@ -310,6 +310,25 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+/* learning recap on the end screen */
+.end.withlearn{gap:16px;justify-content:flex-start;overflow:auto;padding-top:20px}
+.endhead{display:flex;align-items:center;gap:18px;justify-content:center;text-align:left}
+.end.withlearn .big{font-size:min(16vmin,96px)}
+.end.withlearn h2{font-size:clamp(24px,5vmin,40px)}
+.end.withlearn .endhead p{font-size:clamp(15px,3vmin,22px)}
+.learn{background:var(--paper);border-radius:22px;padding:14px 22px 16px;max-width:min(92vw,640px);width:100%;text-align:left;box-shadow:0 6px 0 var(--edge)}
+.learn h3{margin:0 0 6px;font-family:var(--display);font-weight:500;font-size:clamp(17px,3.2vmin,24px);color:var(--yellow)}
+.learn ul{margin:0;padding-left:1.1em;display:grid;gap:4px;font-size:clamp(16px,3.2vmin,24px);line-height:1.35}
+.learn ul.cols{grid-template-columns:repeat(auto-fill,minmax(150px,1fr));column-gap:20px}
+.learn .hearall{margin-top:10px;padding:8px 18px;font-size:clamp(15px,3vmin,20px)}
+.pv{display:flex;gap:6px;align-items:flex-end;flex-wrap:wrap;margin:4px 0 8px}
+.pv .rod{display:grid;grid-template-rows:repeat(10,1fr);gap:2px;padding:3px;border-radius:6px;background:var(--cell)}
+.pv .rod i,.pv .ones i{display:block;width:14px;height:14px;border-radius:3px;background:var(--blue)}
+.pv .ones{display:grid;grid-template-columns:repeat(5,14px);gap:3px;padding:3px}
+.pv .ones i{background:var(--orange)}
+.card.dotcard span{white-space:pre-line;line-height:1.05;letter-spacing:.06em}
+@media (max-height:640px){.pv .rod i,.pv .ones i{width:10px;height:10px}.pv .ones{grid-template-columns:repeat(5,10px)}}
+
 /* guess the word keyboard */
 .wlay.side{flex-wrap:nowrap}
 .wlay.side .wside{max-width:none;flex:none}
@@ -538,13 +557,31 @@ var lastSpoken='',VOICE=null,voiceOK=null,keepU=[],earEl=null;
 var NATIVE=(window.LittleSparksTTS&&typeof window.LittleSparksTTS.speak==='function')?window.LittleSparksTTS:null,earT=null;
 var HAS_TTS=!!(NATIVE||(window.speechSynthesis&&window.SpeechSynthesisUtterance));
 function voiceList(){try{return window.speechSynthesis.getVoices()||[];}catch(e){return[];}}
+/* rank voices so the most natural-sounding English one is used, unless a grown-up picked one */
+function voiceScore(v){
+  var n=(v.name||'').toLowerCase(),l=(v.lang||'').replace('_','-').toLowerCase(),sc=0;
+  if(l.indexOf('en')!==0)return -1;
+  if(l.indexOf('en-gb')===0)sc+=30;
+  if(/natural|neural|online|enhanced|premium|wavenet|studio|siri/.test(n))sc+=50;
+  if(/google/.test(n))sc+=20;
+  if(/compact|espeak|robot|novelty|bad news|bells|zarvox|whisper/.test(n))sc-=60;
+  if(v.localService)sc+=5;
+  return sc;
+}
 function pickVoice(){
   var vs=voiceList();if(!vs.length)return;
-  function L(v){return(v.lang||'').replace('_','-').toLowerCase();}
-  function f(t){for(var i=0;i<vs.length;i++)if(t(vs[i]))return vs[i];return null;}
-  VOICE=f(function(v){return L(v).indexOf('en-gb')===0&&v.localService;})||f(function(v){return L(v).indexOf('en-gb')===0;})||
-    f(function(v){return L(v).indexOf('en')===0&&v.localService;})||f(function(v){return L(v).indexOf('en')===0;})||
-    f(function(v){return v.default;})||vs[0];
+  if(S.voiceName){for(var i=0;i<vs.length;i++)if(vs[i].name===S.voiceName){VOICE=vs[i];return;}}
+  var best=null,bs=-1;vs.forEach(function(v){var sc=voiceScore(v);if(sc>bs){bs=sc;best=v;}});
+  VOICE=best||vs[0];
+}
+function englishVoices(){
+  if(NATIVE&&NATIVE.voices){try{return JSON.parse(NATIVE.voices());}catch(e){return[];}}
+  return voiceList().filter(function(v){return voiceScore(v)>=0;}).sort(function(a,b){return voiceScore(b)-voiceScore(a);})
+    .map(function(v){return{name:v.name,label:v.name.replace(/^(Microsoft|Google|Apple)\s+/,'').replace(/\s*\(.*?\)\s*/g,' ').replace(/ - English.*$/,'').trim().slice(0,26)};});
+}
+function applyVoice(){
+  if(NATIVE){try{if(NATIVE.setVoice)NATIVE.setVoice(S.voiceName||'');if(NATIVE.setRate)NATIVE.setRate(S.rate||.95);}catch(e){}}
+  else{VOICE=null;pickVoice();}
 }
 if(HAS_TTS&&!NATIVE){
   pickVoice();
@@ -578,7 +615,7 @@ function say(text,tapped){
     if(!VOICE)pickVoice();
     var u=new SpeechSynthesisUtterance(text);
     if(VOICE){u.voice=VOICE;u.lang=VOICE.lang;}else u.lang='en-GB';
-    u.rate=.9;u.pitch=1.05;u.volume=1;
+    u.rate=S.rate||.95;u.pitch=1;u.volume=1;
     u.onstart=function(){started=true;voiceOK=true;earTalk(true);};
     u.onend=function(){earTalk(false);};
     u.onerror=function(){earTalk(false);};
@@ -640,7 +677,7 @@ function drawDots(){
 function startGame(def){
   if(limitReached())return allDone();
   screen='game';
-  G={def:def,level:levelOf(def.id),i:0,mistakes:0};
+  G={def:def,level:levelOf(def.id),i:0,mistakes:0,facts:[]};
   G.total=def.rounds(G.level);
   buildShell();
   nextQ();
@@ -692,7 +729,7 @@ function choiceQ(stage,o,done){
       if(locked||G!==g||b.disabled)return;
       if(c.ok){
         locked=true;b.classList.remove('hint');b.classList.add('right');sfx('good');
-        if(o.after)o.after();
+        if(o.after)o.after();if(o.fact)addFact(o.fact);
         done(o.word?example(o.word,stage,row):o.wait);
       }else{
         wrong++;g.mistakes++;b.disabled=true;b.classList.add('nope');sfx('soft');
@@ -710,6 +747,59 @@ function choiceQ(stage,o,done){
     row.appendChild(b);
   });
   stage.appendChild(row);
+}
+
+/* ---------- learning recap: every game ends by showing what she practised ---------- */
+function addFact(t){if(G&&G.facts&&t&&G.facts.indexOf(t)<0)G.facts.push(t);}
+var SHAPEFACT={
+  circle:'A circle is round and has no corners.',square:'A square has 4 sides that are all the same length.',
+  triangle:'A triangle has 3 sides and 3 corners.',rectangle:'A rectangle has 4 sides: 2 long and 2 short.',
+  oval:'An oval is like a stretched circle, like an egg.',diamond:'A diamond has 4 equal sides and stands on a point.',
+  heart:'A heart shape means love.',star:'This star has 5 points.',pentagon:'A pentagon has 5 sides.',
+  hexagon:'A hexagon has 6 sides, like a honeycomb.',octagon:'An octagon has 8 sides, like a stop sign.',
+  semicircle:'A semicircle is half a circle.',crescent:'A crescent is shaped like a thin moon.',cross:'A cross has 12 sides!',
+  arrow:'An arrow shows which way to go.',trapezium:'A trapezium has 4 sides, with a short top and a long bottom.',
+  parallelogram:'A parallelogram looks like a rectangle leaning over.',kite:'A kite has 4 sides: 2 short and 2 long.',
+  cube:'A cube has 6 square faces, like a dice.',sphere:'A sphere is round like a ball.',
+  cone:'A cone has a point and a round bottom, like an ice cream cone.',cylinder:'A cylinder is shaped like a tin can.',
+  cuboid:'A cuboid is shaped like a box.',pyramid:'A pyramid has triangle sides that meet at a point.'
+};
+var COLNAME={red:'red',yellow:'yellow',green:'green',blue:'blue',purple:'purple',pink:'pink'};
+/* 14 -> a picture of 1 ten-stick and 4 ones, plus the words */
+function placeValue(n){
+  var t=Math.floor(n/10),o=n%10,box=h('div',{class:'pv','aria-hidden':'true'});
+  for(var i=0;i<t;i++){var rod=h('span',{class:'rod'});for(var j=0;j<10;j++)rod.appendChild(h('i'));box.appendChild(rod);}
+  var ones=h('span',{class:'ones'});for(var k=0;k<o;k++)ones.appendChild(h('i'));if(o)box.appendChild(ones);
+  var words=t?(n+' is '+t+' ten'+(t>1?'s':'')+(o?' and '+o+' one'+(o>1?'s':''):'')+'.'):(n+' is '+o+' one'+(o!==1?'s':'')+'.');
+  return{el:box,text:words};
+}
+var SAFETY=['Stop, look and listen before you cross the road.','Always hold a grown-up’s hand near busy roads.',
+  'Cross the road at a zebra crossing or when the green man shows.','Always wear your seatbelt in the car.',
+  'Red means stop, amber means get ready, and green means go.','Wear a helmet when you ride your bike.'];
+var CAPYFACTS=['Capybaras are the biggest rodents in the world.','Capybaras come from South America.',
+  'Capybaras love water and are very good swimmers.','A capybara can stay under water for up to five minutes.',
+  'Baby capybaras are called pups.','Capybaras eat grass and water plants.','Capybaras like to live in big friendly groups.'];
+function nextOf(list,key){var P=S.prog||(S.prog={});P[key]=(P[key]||0)+1;return list[P[key]%list.length];}
+/* real-time games describe their own lesson */
+var LESSONS={
+  lights:function(g){var L=(g.seq||[]).length,cols=(g.seq||[]).map(function(i){return PADS[i].c;});
+    return{lines:['You remembered '+L+' lights in a row!',L?'The last one went: '+cols.join(', ')+'.':'','Tip: saying the colours out loud helps you remember them.'].filter(Boolean)};},
+  moles:function(g){if(!g.score)return null;var pv=placeValue(g.score);return{lines:['You popped '+g.score+' moles.',pv.text],visual:pv.el};},
+  bricks:function(g){if(!g.broken)return null;var pv=placeValue(g.broken);return{lines:['You broke '+g.broken+' bricks.',pv.text],visual:pv.el};},
+  race:function(g){return{lines:[(g.stars?'You collected '+g.stars+' star'+(g.stars>1?'s':'')+'.':'You drove the whole way!'),'Road safety: '+nextOf(SAFETY,'tip')]};},
+  capy:function(g){return{lines:['You stacked '+(g.stacked||0)+' orange'+(g.stacked===1?'':'s')+'.','Capybara fact: '+nextOf(CAPYFACTS,'capyfact')]};}
+};
+function learnCard(g){
+  var les=LESSONS[g.def.id]?LESSONS[g.def.id](g):null,lines=les?les.lines:(g.facts||[]).slice(0,6);
+  if(!lines||!lines.length)return null;
+  var card=h('div',{class:'learn'},[h('h3',{text:'What you learned'})]);
+  if(les&&les.visual)card.appendChild(les.visual);
+  var ul=h('ul',{class:lines.every(function(t){return t.length<=16;})?'cols':''});lines.forEach(function(t){ul.appendChild(h('li',{text:t}));});card.appendChild(ul);
+  var spoken=lines.join(' ').replace(/ − /g,' take away ').replace(/ \+ /g,' plus ').replace(/ = /g,' is ');
+  var hear=h('button',{class:'block go alt hearall',type:'button',text:'Read it to me'});
+  hear.addEventListener('click',function(){say(spoken,true);});
+  card.appendChild(hear);
+  return{el:card,spoken:spoken,short:(les?lines:lines.slice(0,3)).join(' ').replace(/ − /g,' take away ').replace(/ \+ /g,' plus ').replace(/ = /g,' is ')};
 }
 
 /* ---------- 1. Count it ---------- */
@@ -730,29 +820,29 @@ function numChoices(n,cands,k){
   return out.map(function(v){return{node:h('span',{class:'num',text:String(v)}),ok:v===n,label:String(v)};});
 }
 function near(n){return[n-1,n+1,n-2,n+2,n+3];}
-function numQ(stage,prompt,show,n,done,cands){
+function numQ(stage,prompt,show,n,done,cands,fact){
   lastN=n;
-  choiceQ(stage,{prompt:prompt,show:show,choices:numChoices(n,cands||near(n),4)},done);
+  choiceQ(stage,{prompt:prompt,show:show,fact:fact,choices:numChoices(n,cands||near(n),4)},done);
 }
 function fresh(make){var v,i=0;do{v=make();}while(v.n===lastN&&++i<8);return v;}
 var COUNTQ={
   count10:function(st,done){var t=pick(THINGS),v=fresh(function(){return{n:between(3,10)};});
-    numQ(st,'How many '+t[1]+'?',h('div',{class:'show'},[groupEl(rep(t[0],v.n))]),v.n,done);},
+    numQ(st,'How many '+t[1]+'?',h('div',{class:'show'},[groupEl(rep(t[0],v.n))]),v.n,done,null,'There were '+v.n+' '+t[1]+'. '+t[0]);},
   count20:function(st,done){var t=pick(THINGS),v=fresh(function(){return{n:between(11,20)};});
-    numQ(st,'How many '+t[1]+'?',h('div',{class:'show'},[groupEl(rep(t[0],v.n))]),v.n,done);},
+    numQ(st,'How many '+t[1]+'?',h('div',{class:'show'},[groupEl(rep(t[0],v.n))]),v.n,done,null,'There were '+v.n+' '+t[1]+'. '+t[0]);},
   kind:function(st,done,level){var ts=sample(THINGS,2),hi=level>=3?8:6,v=fresh(function(){return{n:between(2,hi),b:between(2,hi)};});
-    numQ(st,'How many '+ts[0][1]+'?',h('div',{class:'show'},[groupEl(shuffle(rep(ts[0][0],v.n).concat(rep(ts[1][0],v.b))))]),v.n,done,[v.b,v.n+v.b,v.n-1,v.n+1]);},
+    numQ(st,'How many '+ts[0][1]+'?',h('div',{class:'show'},[groupEl(shuffle(rep(ts[0][0],v.n).concat(rep(ts[1][0],v.b))))]),v.n,done,[v.b,v.n+v.b,v.n-1,v.n+1],'There were '+v.n+' '+ts[0][1]+' and '+v.b+' '+ts[1][1]+'.');},
   addPic:function(st,done){var t=pick(THINGS),v=fresh(function(){var a=between(1,5),b=between(1,5);return{a:a,b:b,n:a+b};});
-    numQ(st,'How many '+t[1]+' altogether?',h('div',{class:'show'},[groupEl(rep(t[0],v.a)),h('span',{class:'plus',text:'+'}),groupEl(rep(t[0],v.b))]),v.n,done);},
+    numQ(st,'How many '+t[1]+' altogether?',h('div',{class:'show'},[groupEl(rep(t[0],v.a)),h('span',{class:'plus',text:'+'}),groupEl(rep(t[0],v.b))]),v.n,done,null,v.a+' + '+v.b+' = '+v.n);},
   subPic:function(st,done){var t=pick(THINGS),v=fresh(function(){var a=between(4,10),b=between(1,a-1);return{a:a,b:b,n:a-b};});
-    numQ(st,v.a+' '+t[1]+'. Take away '+v.b+'. How many are left?',h('div',{class:'show'},[groupEl(rep(t[0],v.a),v.b)]),v.n,done,[v.a,v.b,v.n-1,v.n+1]);},
+    numQ(st,v.a+' '+t[1]+'. Take away '+v.b+'. How many are left?',h('div',{class:'show'},[groupEl(rep(t[0],v.a),v.b)]),v.n,done,[v.a,v.b,v.n-1,v.n+1],v.a+' − '+v.b+' = '+v.n);},
   more:function(st,done){var ts=sample(THINGS,2),a=between(3,9),b;do{b=between(3,9);}while(b===a);
     var more=rnd(2)===0,first=more?a>b:a<b;
     choiceQ(st,{prompt:more?'Which group has more?':'Which group has fewer?',choices:[
       {node:groupEl(rep(ts[0][0],a)),ok:first,wide:true,label:a+' '+ts[0][1]},
-      {node:groupEl(rep(ts[1][0],b)),ok:!first,wide:true,label:b+' '+ts[1][1]}]},done);},
+      {node:groupEl(rep(ts[1][0],b)),ok:!first,wide:true,label:b+' '+ts[1][1]}],fact:Math.max(a,b)+' is more than '+Math.min(a,b)+'.'},done);},
   diff:function(st,done){var ts=sample(THINGS,2),v=fresh(function(){var b=between(2,6),a=b+between(1,5);return{a:a,b:b,n:a-b};});
-    numQ(st,'How many more '+ts[0][1]+' than '+ts[1][1]+'?',h('div',{class:'show col'},[groupEl(rep(ts[0][0],v.a)),groupEl(rep(ts[1][0],v.b))]),v.n,done,[v.a,v.b,v.n+1,v.n-1]);},
+    numQ(st,'How many more '+ts[0][1]+' than '+ts[1][1]+'?',h('div',{class:'show col'},[groupEl(rep(ts[0][0],v.a)),groupEl(rep(ts[1][0],v.b))]),v.n,done,[v.a,v.b,v.n+1,v.n-1],v.a+' is '+v.n+' more than '+v.b+'.');},
   seq:function(st,done,level){
     var step=level<=2?1:(level===3?pick([1,-1,2]):(level===4?pick([2,5,10,-1]):pick([-2,3,-5,-10,4])));
     var len=5,start=step>0?(Math.abs(step)===10?between(0,4)*10:(step===5?between(0,4)*5:between(1,10))):between(5,12)*Math.abs(step);
@@ -761,19 +851,19 @@ var COUNTQ={
     var row=h('div',{class:'nums'});
     vals.forEach(function(v,k){row.appendChild(h('div',{class:k===hide?'q':'',text:k===hide?'?':String(v)}));});
     var n=vals[hide],s=Math.abs(step);
-    numQ(st,'What number is missing?',h('div',{class:'show'},[row]),n,done,[n+s,n-s,n+1,n-1,n+2*s]);},
+    numQ(st,'What number is missing?',h('div',{class:'show'},[row]),n,done,[n+s,n-s,n+1,n-1,n+2*s],'Counting '+(step>0?'on':'back')+' in '+(s>1?s+'s':'ones')+': '+vals.join(', ')+'.');},
   addNum:function(st,done){var v=fresh(function(){var a=between(3,12),b=between(2,20-a>9?9:20-a);return{a:a,b:b,n:a+b};});
-    numQ(st,'What is '+v.a+' add '+v.b+'?',h('div',{class:'eq',text:v.a+' + '+v.b+' = ?'}),v.n,done);},
+    numQ(st,'What is '+v.a+' add '+v.b+'?',h('div',{class:'eq',text:v.a+' + '+v.b+' = ?'}),v.n,done,null,v.a+' + '+v.b+' = '+v.n);},
   subNum:function(st,done,level){var hi=level>=5?20:10,v=fresh(function(){var a=between(5,hi),b=between(2,Math.min(a-1,9));return{a:a,b:b,n:a-b};});
-    numQ(st,'What is '+v.a+' take away '+v.b+'?',h('div',{class:'eq',text:v.a+' − '+v.b+' = ?'}),v.n,done);},
+    numQ(st,'What is '+v.a+' take away '+v.b+'?',h('div',{class:'eq',text:v.a+' − '+v.b+' = ?'}),v.n,done,null,v.a+' − '+v.b+' = '+v.n);},
   missing:function(st,done){var v=fresh(function(){var a=between(2,9),n=between(2,9);return{a:a,n:n,t:a+n};});
-    numQ(st,'What number is missing?',h('div',{class:'eq',text:v.a+' + ? = '+v.t}),v.n,done,[v.t,v.a,v.n+1,v.n-1]);},
+    numQ(st,'What number is missing?',h('div',{class:'eq',text:v.a+' + ? = '+v.t}),v.n,done,[v.t,v.a,v.n+1,v.n-1],v.a+' + '+v.n+' = '+v.t);},
   double:function(st,done){
     var v;
     if(rnd(2)){v=fresh(function(){var a=between(2,10);return{a:a,n:a*2};});
-      numQ(st,'What is double '+v.a+'?',h('div',{class:'eq',text:v.a+' + '+v.a+' = ?'}),v.n,done,[v.a,v.n+2,v.n-2,v.n+1]);}
+      numQ(st,'What is double '+v.a+'?',h('div',{class:'eq',text:v.a+' + '+v.a+' = ?'}),v.n,done,[v.a,v.n+2,v.n-2,v.n+1],'Double '+v.a+' is '+v.n+'.');}
     else{v=fresh(function(){var n=between(2,10);return{a:n*2,n:n};});
-      numQ(st,'What is half of '+v.a+'?',h('div',{class:'eq',text:'? + ? = '+v.a}),v.n,done,[v.a,v.n+1,v.n-1,v.n+2]);}
+      numQ(st,'What is half of '+v.a+'?',h('div',{class:'eq',text:'? + ? = '+v.a}),v.n,done,[v.a,v.n+1,v.n-1,v.n+2],'Half of '+v.a+' is '+v.n+'.');}
   }
 };
 var COUNTMIX={1:['count10'],2:['count20','kind','addPic','seq'],3:['kind','addPic','subPic','more','seq','seq'],
@@ -816,7 +906,7 @@ function spellQ(stage,w,extra,done){
       if(ch===letters[pos]){
         slotEls[pos].textContent=ch;slotEls[pos].classList.add('filled');
         b.disabled=true;b.classList.add('used');pos++;
-        if(pos===letters.length){sfx('good');done(example(word,stage,row));}else sfx('tick');
+        if(pos===letters.length){sfx('good');addFact(w[1]+' '+word);done(example(word,stage,row));}else sfx('tick');
       }else{
         if(row.classList.contains('wait'))return;
         g.mistakes++;sfx('soft');
@@ -906,13 +996,13 @@ var LETQ={
     var w,i=0;do{w=pick(FIRST);}while(w[1]===lastWord&&++i<8);lastWord=w[1];
     var bad=w[0]==='c'?'k':(w[0]==='k'?'c':'');
     var others=sample(ABC.filter(function(x){return x!==w[0]&&x!==bad;}),3);
-    choiceQ(st,{word:w[1],prompt:'What sound does this start with?',spoken:'What sound does '+w[1]+' start with?',show:picEl(w[2],w[1]),
+    choiceQ(st,{word:w[1],fact:w[2]+' '+w[1]+' starts with '+w[0]+'.',prompt:'What sound does this start with?',spoken:'What sound does '+w[1]+' start with?',show:picEl(w[2],w[1]),
       choices:shuffle(others.concat([w[0]])).map(function(x){return{node:h('span',{class:'ltr',text:x}),ok:x===w[0],label:x};})},done);
   },
   middle:function(st,done){
     var w=freshWord(CVC),v=w[0].charAt(1);
     var others=sample('aeiou'.split('').filter(function(x){return x!==v;}),3);
-    choiceQ(st,{word:w[0],prompt:'What sound is in the middle?',spoken:'What sound is in the middle of '+w[0]+'?',show:picEl(w[1],w[0]),
+    choiceQ(st,{word:w[0],fact:w[1]+' '+w[0]+' has '+v+' in the middle.',prompt:'What sound is in the middle?',spoken:'What sound is in the middle of '+w[0]+'?',show:picEl(w[1],w[0]),
       choices:shuffle(others.concat([v])).map(function(x){return{node:h('span',{class:'ltr',text:x}),ok:x===v,label:x};})},done);
   },
   read:function(st,done,list){
@@ -920,7 +1010,7 @@ var LETQ={
     var same=list.filter(function(x){return x[0]!==w[0]&&x[0].charAt(0)===w[0].charAt(0);});
     var rest=list.filter(function(x){return x[0]!==w[0]&&x[0].charAt(0)!==w[0].charAt(0);});
     var others=shuffle(same).concat(shuffle(rest)).slice(0,3);
-    choiceQ(st,{word:w[0],prompt:'Which word matches the picture?',show:h('div',{class:'show'},[h('span',{class:'pic',text:w[1]})]),
+    choiceQ(st,{word:w[0],fact:w[1]+' '+w[0],prompt:'Which word matches the picture?',show:h('div',{class:'show'},[h('span',{class:'pic',text:w[1]})]),
       choices:shuffle(others.concat([w])).map(function(x){return{node:h('span',{class:'wordtxt',text:x[0]}),ok:x[0]===w[0],wide:true,label:x[0]};})},done);
   }
 };
@@ -949,7 +1039,7 @@ function nameQ(st,done,pool,k,level){
   var opts,target,i=0,cols=shuffle(COLS);
   do{opts=sample(pool,k);target=pick(opts);}while(target===lastShape&&++i<8);
   lastShape=target;
-  choiceQ(st,{prompt:'Tap the '+target,choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j%cols.length],rotFor(s,level)),ok:s===target,label:s};})},done);
+  choiceQ(st,{fact:SHAPEFACT[target],prompt:'Tap the '+target,choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j%cols.length],rotFor(s,level)),ok:s===target,label:s};})},done);
 }
 function sidesSet(){
   return sample([3,4,5,6,8],4).map(function(n){return{n:n,s:pick(BYSIDES[n])};});
@@ -965,27 +1055,27 @@ var SHAPEQ={
     var ss=sample(S1,2),cs=sample(COLS,2),opts=[],t=rnd(4);
     ss.forEach(function(s){cs.forEach(function(c){opts.push({s:s,c:c});});});
     var target=opts[t];opts=shuffle(opts);
-    choiceQ(st,{prompt:'Tap the '+target.c+' '+target.s,choices:opts.map(function(o){return{node:shapeEl(o.s,o.c),ok:o===target,label:o.c+' '+o.s};})},done);
+    choiceQ(st,{fact:SHAPEFACT[target.s],prompt:'Tap the '+target.c+' '+target.s,choices:opts.map(function(o){return{node:shapeEl(o.s,o.c),ok:o===target,label:o.c+' '+o.s};})},done);
   },
   sides:function(st,done,l){
     var set=sidesSet(),target=pick(set),cols=shuffle(COLS),word=l>=4&&rnd(2)?'corners':'sides';
-    choiceQ(st,{prompt:'Which shape has '+target.n+' '+word+'?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
+    choiceQ(st,{fact:SHAPEFACT[target.s],prompt:'Which shape has '+target.n+' '+word+'?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
   },
   most:function(st,done,l){
     var set=sidesSet(),most=l<5||rnd(2)===0,cols=shuffle(COLS);
     var target=set.reduce(function(a,b){return(most?b.n>a.n:b.n<a.n)?b:a;});
-    choiceQ(st,{prompt:most?'Which shape has the most sides?':'Which shape has the fewest sides?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
+    choiceQ(st,{fact:SHAPEFACT[target.s],prompt:most?'Which shape has the most sides?':'Which shape has the fewest sides?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
   },
   curvy:function(st,done){
     var good=pick(['circle','oval']),cols=shuffle(COLS);
     var opts=shuffle(sample(['square','triangle','rectangle','pentagon','hexagon','diamond','star','trapezium'],3).concat([good]));
-    choiceQ(st,{prompt:'Which shape has no corners?',choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j]),ok:s===good,label:s};})},done);
+    choiceQ(st,{fact:SHAPEFACT[good],prompt:'Which shape has no corners?',choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j]),ok:s===good,label:s};})},done);
   },
   odd:function(st,done,l){
     var pool=l>=4?S3:S2,pair=sample(pool,2),k=l>=4?6:4,cols=shuffle(COLS),opts=[];
     for(var i=0;i<k-1;i++)opts.push({s:pair[0],odd:false});
     opts.push({s:pair[1],odd:true});opts=shuffle(opts);
-    choiceQ(st,{prompt:'Which is the odd one out?',choices:opts.map(function(o,j){return{node:shapeEl(o.s,cols[j%cols.length],rotFor(o.s,l)),ok:o.odd,label:o.s};})},done);
+    choiceQ(st,{fact:SHAPEFACT[pair[1]],prompt:'Which is the odd one out?',choices:opts.map(function(o,j){return{node:shapeEl(o.s,cols[j%cols.length],rotFor(o.s,l)),ok:o.odd,label:o.s};})},done);
   }
 };
 var SHAPEMIX={1:['n1'],2:['n2','n2','both'],3:['n3','sides','odd','d3a','both','n3'],4:['n3','d3b','sides','odd','most','curvy'],5:['all','sides','most','odd','curvy','d3b']};
@@ -998,7 +1088,7 @@ var shapesGame={id:'shapes',name:'Shapes',c:'yellow',
 var BITS=[['circle','red'],['square','blue'],['triangle','yellow'],['star','green'],['heart','pink'],['diamond','purple']];
 function itemEl(it){return shapeEl(it.s,it.c,it.r||0);}
 function itemKey(it){return it.s+'|'+it.c+'|'+(it.r||0);}
-function patQ(stage,items,hide,opts,done){
+function patQ(stage,items,hide,opts,done,fact){
   var ans=items[hide],gap=null,seq=h('div',{class:'seq'});
   items.forEach(function(it,i){
     if(i===hide){gap=h('div',{class:'cell gap',text:'?'});seq.appendChild(gap);}
@@ -1008,6 +1098,7 @@ function patQ(stage,items,hide,opts,done){
     prompt:hide===items.length-1?'What comes next?':'What is missing?',
     show:h('div',{class:'show'},[seq]),
     choices:shuffle(opts).map(function(o){return{node:itemEl(o),ok:itemKey(o)===itemKey(ans),label:o.c+' '+o.s};}),
+    fact:fact,
     after:function(){gap.textContent='';gap.classList.add('filled');gap.appendChild(itemEl(ans));}
   },done);
 }
@@ -1019,7 +1110,9 @@ var PATQ={
     t.split('').forEach(function(k){if(used.indexOf(k)<0)used.push(k);});
     if(used.length<3)used.push('C');
     var hide=level>=2&&rnd(2)?t.length-1-between(1,3):t.length-1;
-    patQ(st,t.split('').map(function(k){return map[k];}),hide,used.map(function(k){return map[k];}),done);
+    var unit=t;for(var u=1;u<t.length;u++){var ok=true;for(var q=0;q<t.length;q++)if(t.charAt(q)!==t.charAt(q%u)){ok=false;break;}if(ok){unit=t.slice(0,u);break;}}
+    var pf=unit===t?'This pattern went forwards, then backwards.':'This pattern went '+unit.split('').map(function(k){return map[k].c+' '+map[k].s;}).join(', ')+', then started again.';
+    patQ(st,t.split('').map(function(k){return map[k];}),hide,used.map(function(k){return map[k];}),done,pf);
   },
   two:function(st,done,level){
     var flip=rnd(2),ps=flip?3:2,pc=flip?2:3;
@@ -1027,7 +1120,7 @@ var PATQ={
     for(var i=0;i<8;i++)items.push({s:sh[i%ps],c:co[i%pc]});
     var hide=level>=5||(level===4&&rnd(2))?between(3,6):7,a=items[hide];
     var os=sh[(sh.indexOf(a.s)+1)%ps],oc=co[(co.indexOf(a.c)+1)%pc];
-    patQ(st,items,hide,[a,{s:a.s,c:oc},{s:os,c:a.c},{s:os,c:oc}],done);
+    patQ(st,items,hide,[a,{s:a.s,c:oc},{s:os,c:a.c},{s:os,c:oc}],done,'The shapes repeated every '+ps+' and the colours repeated every '+pc+'.');
   },
   turn:function(st,done,level){
     var step=level>=5?pick([45,-45,-90,135]):pick([90,-90]),start=rnd(4)*90,c=pick(COLS),items=[];
@@ -1035,7 +1128,7 @@ var PATQ={
     for(var i=0;i<6;i++)items.push({s:'arrow',c:c,r:norm(start+i*step)});
     var hide=level>=5&&rnd(2)?between(2,4):5,a=items[hide];
     var offs=Math.abs(step)===90?[90,180,270]:[45,-45,180];
-    patQ(st,items,hide,[a].concat(offs.map(function(o){return{s:'arrow',c:c,r:norm(a.r+o)};})),done);
+    patQ(st,items,hide,[a].concat(offs.map(function(o){return{s:'arrow',c:c,r:norm(a.r+o)};})),done,Math.abs(step)===90?'The arrow turned a quarter turn each time.':'The arrow turned the same amount each time.');
   }
 };
 var PATMIX={1:['letters'],2:['letters'],3:['letters','letters','two'],4:['two','turn','letters'],5:['two','turn','two']};
@@ -1044,26 +1137,38 @@ var nextGame={id:'next',name:"What's next?",c:'green',
   play:function(level,stage,done){PATQ[fromMix(PATMIX[level])](stage,done,level);}
 };
 
-/* ---------- 5. Pairs ---------- */
+/* ---------- 5. Pairs: five kinds of matching, taking turns ---------- */
 var FACES=['🐱','🐶','🐸','🐷','🐮','🐔','🐟','🐝','🍎','🍌','🍇','⭐','🌙','🚗','🚌','🚀','⚽','🔑','🔔','🌳'];
-function pairDeck(level){
-  var d=[];
-  if(level<=3){sample(FACES,[0,6,8,12][level]).forEach(function(f){d.push({k:f,t:f,z:.56},{k:f,t:f,z:.56});});}
-  else if(level===4){sample('abdeghmnqrt'.split(''),10).forEach(function(l){d.push({k:l,t:l,z:.6},{k:l,t:l.toUpperCase(),z:.6});});}
-  else{sample([3,4,5,6,7,8,9,10,11,12],10).forEach(function(n){var a=between(1,n-1);d.push({k:n,t:String(n),z:.5},{k:n,t:a+'+'+(n-a),z:.3});});}
+var FACENAME={'🐱':'cat','🐶':'dog','🐸':'frog','🐷':'pig','🐮':'cow','🐔':'hen','🐟':'fish','🐝':'bee','🍎':'apple','🍌':'banana','🍇':'grapes','⭐':'star','🌙':'moon','🚗':'car','🚌':'bus','🚀':'rocket','⚽':'ball','🔑':'key','🔔':'bell','🌳':'tree'};
+var PAIRMODES={1:['pics'],2:['pics','dots'],3:['pics','words','dots'],4:['case','words','dots'],5:['sums','case','words']};
+var PAIRPROMPT={pics:'Find the pairs',dots:'Match each number to its dots',words:'Match each picture to its word',case:'Match big letters to small letters',sums:'Match each sum to its answer'};
+function dotsText(n){var s='';for(var i=0;i<n;i++){s+='●';if(i%5===4&&i<n-1)s+='\n';}return s;}
+function pairDeck(level,mode){
+  var np=[0,3,6,8,10,10][level],d=[];
+  if(mode==='pics')sample(FACES,np).forEach(function(f){var nm=FACENAME[f];d.push({k:f,t:f,z:.56,say:nm,fact:f+' '+nm},{k:f,t:f,z:.56});});
+  else if(mode==='dots'){
+    for(var n=1;n<=np;n++){d.push({k:n,t:String(n),z:.5,say:String(n),fact:dotsText(n).replace('\n','')+' = '+n},{k:n,t:dotsText(n),z:n>5?.17:.2,dots:true});}
+  }else if(mode==='words'){
+    sample(level>=5?W4:W3,np).forEach(function(w){d.push({k:w[0],t:w[1],z:.5,say:w[0],fact:w[1]+' '+w[0]},{k:w[0],t:w[0],z:w[0].length>3?.24:.3,word:true});});
+  }else if(mode==='case'){
+    sample('abdeghmnqrt'.split(''),np).forEach(function(l){d.push({k:l,t:l.toUpperCase(),z:.6,say:l,fact:l.toUpperCase()+' '+l},{k:l,t:l,z:.6});});
+  }else{
+    sample([3,4,5,6,7,8,9,10,11,12],np).forEach(function(n){var a=between(1,n-1);d.push({k:n,t:a+'+'+(n-a),z:.3,say:a+' plus '+(n-a)+' is '+n,fact:a+' + '+(n-a)+' = '+n},{k:n,t:String(n),z:.5});});
+  }
   return shuffle(d);
 }
 var pairsGame={id:'pairs',name:'Pairs',c:'purple',
   rounds:function(){return 1;},
   play:function(level,stage,done){
-    var g=G,deck=pairDeck(level),n=deck.length,pairs=n/2;
-    var wide=window.innerWidth>window.innerHeight,cols=n===12?(wide?4:3):(wide?n/4:4),rows=n/cols;
+    var g=G,modes=PAIRMODES[level],mode=nextOf(modes,'pairs'+level),deck=pairDeck(level,mode),n=deck.length,pairs=n/2;
+    var info={};deck.forEach(function(c){if(c.fact)info[c.k]=c;});
+    var wide=window.innerWidth>window.innerHeight,cols=n===6?3:(n===12?(wide?4:3):(wide?n/4:4)),rows=n/cols;
     var cs=Math.floor(Math.min((window.innerWidth-32-(cols-1)*12)/cols,(window.innerHeight-200-(rows-1)*12)/rows-6,150));
-    setPrompt(level===4?'Match big letters to small letters':(level===5?'Match each sum to its answer':'Find the pairs'));
+    setPrompt(PAIRPROMPT[mode]);
     var open=[],found=0,miss=0,busy=false;
     var grid=h('div',{class:'cards',style:'grid-template-columns:repeat('+cols+',auto)'});
     deck.forEach(function(c){
-      var b=h('button',{class:'block card',type:'button','aria-label':'Card',style:'width:'+cs+'px;height:'+cs+'px;font-size:'+Math.round(cs*c.z)+'px'},[h('span',{text:c.t})]);
+      var b=h('button',{class:'block card'+(c.dots?' dotcard':''),type:'button','aria-label':'Card',style:'width:'+cs+'px;height:'+cs+'px;font-size:'+Math.round(cs*c.z)+'px'},[h('span',{text:c.t})]);
       b.addEventListener('click',function(){
         if(G!==g||busy||b.classList.contains('up'))return;
         b.classList.add('up');sfx('tick');open.push({b:b,k:c.k});
@@ -1072,7 +1177,8 @@ var pairsGame={id:'pairs',name:'Pairs',c:'purple',
         if(x.k===y.k){
           x.b.classList.add('gone');y.b.classList.add('gone');x.b.disabled=y.b.disabled=true;
           found++;sfx('good');
-          if(found===pairs){if(miss>pairs*2)g.mistakes+=2;done(1100);}
+          var m=info[x.k];if(m){say(m.say);addFact(m.fact);}
+          if(found===pairs){if(miss>pairs*2)g.mistakes+=2;done(1600);}
         }else{
           miss++;busy=true;
           setTimeout(function(){x.b.classList.remove('up');y.b.classList.remove('up');busy=false;},1000);
@@ -1110,6 +1216,9 @@ var copyGame={id:'copy',name:'Copy it',c:'pink',
         if(mine.join()===want.join()){
           locked=true;me.classList.add('done');sfx('good');
           if(taps>count*2)g.mistakes++;
+          var cnt={};want.forEach(function(v){if(v)cnt[paints[v-1]]=(cnt[paints[v-1]]||0)+1;});
+          addFact('Picture '+(g.i+1)+': '+Object.keys(cnt).map(function(c){return cnt[c]+' '+c;}).join(', ')+' square'+(count>1?'s':'')+'.');
+          if(cfg.mirror)addFact('In a mirror picture, left and right swap over.');
           done(1300);
         }
       });
@@ -1170,7 +1279,7 @@ var MUSQ={
       ping(i);x.flash(i);
       if(i!==seq[pos])return;
       x.bars[i].classList.remove('next');pos++;
-      if(pos===seq.length){setPrompt('You played '+tune[0]+'!');done(2600);}
+      if(pos===seq.length){setPrompt('You played '+tune[0]+'!');addFact('You played '+tune[0]+'.');done(2600);}
       else setTimeout(function(){if(G===g)x.bars[seq[pos]].classList.add('next');},120);
     });
     x.bars[seq[0]].classList.add('next');
@@ -1190,7 +1299,7 @@ var MUSQ={
       ping(i);x.flash(i);
       if(i===seq[pos]){
         pos++;
-        if(pos===seq.length){msg.textContent='You got it!';busy=true;done(1300);}
+        if(pos===seq.length){msg.textContent='You got it!';busy=true;addFact('You copied a tune with '+len+' notes.');done(1300);}
       }else{
         g.mistakes++;busy=true;msg.textContent='Not quite. Listen again.';
         setTimeout(function(){if(G===g)play();},1100);
@@ -1209,7 +1318,7 @@ var MUSQ={
       var el=h('button',{class:'block choice',type:'button','aria-label':k?'Second note':'First note'},[h('span',{class:'num',text:String(k+1)})]);
       el.addEventListener('click',function(){
         if(G!==g||busy||locked||el.disabled)return;
-        if(k===ans){locked=true;el.classList.add('right');sfx('good');done(1100);}
+        if(k===ans){locked=true;el.classList.add('right');sfx('good');addFact('Short bars make high notes. Long bars make low notes.');done(1100);}
         else{g.mistakes++;el.disabled=true;el.classList.add('nope');sfx('soft');busy=true;setTimeout(function(){if(G===g)busy=false;},700);}
       });
       return el;
@@ -1589,7 +1698,7 @@ var moleGame={id:'moles',name:'Mole pop',c:'lime',
     function finish(){
       running=false;clearInterval(tick);
       timers.forEach(clearTimeout);holes.forEach(down);
-      var newBest=score>best;
+      g.score=score;var newBest=score>best;
       if(newBest){S.best[level]=score;save();}
       g.endIcon=newBest?'🏆':'⭐';
       g.endTitle=newBest?'New best score: '+score+'!':'You scored '+score+'!';
@@ -1692,13 +1801,13 @@ var brickGame={id:'bricks',name:'Brick bash',c:'indigo',
       else sfx('tick');
     }
     function win(){
-      alive=false;g.endIcon='🧱';g.endTitle='You broke every brick!';sfx('win');
+      alive=false;g.broken=broken;g.endIcon='🧱';g.endTitle='You broke every brick!';sfx('win');
       setTimeout(function(){if(G===g)done(300);},1200);
     }
     function lose(){
       lives--;g.mistakes++;buzz();
       if(lives<=0){
-        alive=false;g.endIcon='⭐';g.endTitle='Good try!';g.endNote='You broke '+broken+' of '+total+' bricks.';
+        alive=false;g.broken=broken;g.endIcon='⭐';g.endTitle='Good try!';g.endNote='You broke '+broken+' of '+total+' bricks.';
         setTimeout(function(){if(G===g)done(300);},900);
       }else hold();
     }
@@ -1849,7 +1958,7 @@ var raceGame={id:'race',name:'Road race',c:'sky',
       return[laneW*.2,laneW*.2];
     }
     function finish(win){
-      state='done';
+      state='done';g.stars=stars;
       if(win){g.endIcon='🏁';g.endTitle='You finished the race!';g.endNote=stars?'You collected '+stars+' star'+(stars>1?'s':'')+'.':'Well driven!';sfx('win');}
       else{g.endIcon='⭐';g.endTitle='Good try!';g.endNote='You drove '+Math.round(Math.min(1,dist/total)*100)+'% of the race.';}
       setTimeout(function(){if(G===g)done(300);},win?1500:900);
@@ -1968,8 +2077,8 @@ var capyGame={id:'capy',name:'Capy stack',c:'brown',
     function onResize(){if(G!==g){window.removeEventListener('resize',onResize);return;}var oW=W,oH=H;layout();if(oW&&oH){stack.forEach(function(s){s.x=W/2+(s.x-oW/2)*(W/oW);});}}
     window.addEventListener('resize',onResize);
     function end(win){
-      state='done';
-      if(win){happy=1;g.endIcon='🍊';g.endTitle='The capybara is so happy!';g.endNote='You stacked '+stack.length+' oranges.';sfx('win');say('You stacked '+stack.length+' oranges!');}
+      state='done';g.stacked=stack.length;
+      if(win){happy=1;g.endIcon='🍊';g.endTitle='The capybara is so happy!';sfx('win');}
       else{g.endIcon='⭐';g.endTitle='Good try!';g.endNote='You stacked '+stack.length+' of '+goal+' oranges.';}
       setTimeout(function(){if(G===g)done(300);},win?2200:1200);
     }
@@ -2285,7 +2394,7 @@ var sortPuz={id:'sort',name:'Sort it',
     }
     function finish(){
       grid.style.display='none';msg.textContent='';
-      setPrompt('All sorted!');sfx('win');
+      setPrompt('All sorted!','All sorted! '+cats.map(function(c){return c[0];}).join(', ')+'.');sfx('win');
       puzzleDone(sortPuz,stage);
     }
     st.solved.forEach(band);
@@ -2460,13 +2569,13 @@ function roundEnd(){
   if(limitReached())return allDone();
   screen='end';G=null;
   $app.innerHTML='';
-  var title=g.endTitle||'Well done!';
-  sfx('win');say(title);
+  var title=g.endTitle||'Well done!',card=learnCard(g);
+  sfx('win');say(card?title+' '+card.short:title);
   var again=h('button',{class:'block go alt',type:'button',text:'Play again'});
   again.addEventListener('click',function(){startGame(g.def);});
-  $app.appendChild(h('div',{class:'end'},[
-    h('div',{class:'big',text:g.endIcon||'⭐'}),h('h2',{text:title}),
-    g.endNote?h('p',{text:g.endNote}):null,
+  $app.appendChild(h('div',{class:'end'+(card?' withlearn':'')},[
+    h('div',{class:'endhead'},[h('div',{class:'big',text:g.endIcon||'⭐'}),h('div',{},[h('h2',{text:title}),g.endNote?h('p',{text:g.endNote}):null])]),
+    card?card.el:null,
     h('div',{class:'endbtns'},[homeButton(),again])
   ]));
 }
@@ -2520,6 +2629,9 @@ function parent(){
   w.appendChild(segRow('Warm night light',[[true,'On'],[false,'Off']],S.warm,function(v){S.warm=v;}));
   w.appendChild(h('h3',{text:'Sound'}));
   w.appendChild(segRow('Read questions aloud',[[true,'On'],[false,'Off']],S.voice,function(v){S.voice=v;}));
+  var vl=englishVoices();
+  if(vl.length>1)w.appendChild(segRow('Voice',[['','Most natural']].concat(vl.slice(0,8).map(function(v){return[v.name,v.label];})),S.voiceName||'',function(v){S.voiceName=v;applyVoice();setTimeout(function(){say('Hello! This is how I sound.',true);},150);}));
+  w.appendChild(segRow('Speaking speed',[[.8,'Slower'],[.95,'Normal'],[1.1,'Faster']],S.rate||.95,function(v){S.rate=v;applyVoice();}));
   w.appendChild(segRow('Sound effects',[[true,'On'],[false,'Off']],S.sfx,function(v){S.sfx=v;}));
   var stat=h('p',{class:'pstat',text:voiceStatus()});
   var test=h('button',{class:'segb',type:'button',text:'Test voice'});
@@ -2528,7 +2640,7 @@ function parent(){
     setTimeout(function(){if(screen==='parent')stat.textContent=voiceStatus();},3200);
   });
   w.appendChild(h('div',{class:'prow'},[h('span',{class:'plabel',text:'Voice check'}),test,stat]));
-  w.appendChild(h('p',{text:'The speaker button in every game reads the question again, even when reading aloud is off.'}));
+  w.appendChild(h('p',{text:'The speaker button in every game reads the question again, even when reading aloud is off. Voices come from the device. On a Fire tablet, a better voice can be downloaded in the tablet\u2019s text-to-speech settings, then chosen here.'}));
   var B=S.best||{},bl=[1,2,3,4,5].filter(function(l){return B[l];}).map(function(l){return'level '+l+': '+B[l];});
   w.appendChild(h('h3',{text:'Mole pop best scores'}));
   w.appendChild(h('p',{text:bl.length?bl.join(', ')+'.':'No scores yet.'}));
@@ -2570,6 +2682,7 @@ window.addEventListener('popstate',function(){if(inPlay){inPlay=false;home(true)
   document.addEventListener('touchcancel',cancel,{passive:true});
 })();
 
+applyVoice();
 applyTheme();
 home();
 /* installed app: work offline, and ask the browser to keep her progress */
