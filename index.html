@@ -316,6 +316,10 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+.addlbl{font-size:clamp(14px,2.8vmin,18px)!important;margin-top:8px!important}
+.addtime{display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.addtime .hold{padding:14px 22px;font-size:clamp(16px,3vmin,20px);border-width:3px;color:var(--ink)}
+
 .phead{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;position:sticky;top:-20px;margin:-20px -20px 0;padding:16px 20px 12px;background:var(--board);z-index:2;box-shadow:0 8px 14px -10px rgba(0,0,0,.6)}
 .phead .go{padding:12px 24px;font-size:clamp(17px,3vmin,22px)}
 
@@ -2823,7 +2827,13 @@ function allDone(){
   $app.appendChild(h('div',{class:'end'},[
     h('div',{class:'big',text:'🌙'}),h('h2',{text:'All done for today'}),
     h('p',{text:'Time to play something else.'}),
-    holdButton('Grown-ups: hold for 3 seconds',parent)
+    h('p',{class:'addlbl',text:'Grown-ups: press and hold to add more time'}),
+    h('div',{class:'addtime'},[10,20,30].map(function(m){
+      return holdButton('+'+m+' minutes',function(){
+        rollDay();S.bonus+=m*60;save();sfx('good');
+        say(m+' more minutes. Have fun!',true);home();
+      });
+    }))
   ]));
 }
 function segRow(label,opts,current,onPick){
