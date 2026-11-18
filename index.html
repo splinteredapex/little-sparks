@@ -32,6 +32,8 @@
   --lime:#7aa83a;  --lime-d:#557724;
   --sky:#2f95cc;   --sky-d:#1f6c96;
   --brown:#9a6a3c; --brown-d:#6c4823;
+  --magenta:#b9548f;--magenta-d:#863a66;
+  --forest:#4f8f45; --forest-d:#35662e;
   --display:"Fredoka","Trebuchet MS","Segoe UI",sans-serif;
   --body:"Andika","Comic Sans MS","Trebuchet MS",sans-serif; /* infant letterforms: single-storey a and g */
 }
@@ -53,6 +55,8 @@
   --lime:#86b83f;  --lime-d:#5d8327;
   --sky:#37a6e0;   --sky-d:#2479a8;
   --brown:#a8743f; --brown-d:#7a5226;
+  --magenta:#c45a98;--magenta-d:#913f6f;
+  --forest:#56994a; --forest-d:#3a6d32;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;margin:0;overscroll-behavior:none}
@@ -310,6 +314,27 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+.hubhead h1{white-space:nowrap}
+.htile .ico{height:clamp(42px,8.5vmin,66px);max-width:86%;display:flex;align-items:center;justify-content:center;gap:6%;font-size:clamp(30px,6.6vmin,52px);line-height:1}
+.htile .ico svg{height:100%;width:auto;min-width:0;flex:0 1 auto}
+.htile .ico.molei{width:auto;height:clamp(48px,9.5vmin,74px)}
+.htile .ico.molei svg{width:auto;height:100%}
+
+/* home: one grid of equal tiles under a fixed header */
+.hub{flex:1;display:flex;flex-direction:column;min-height:0}
+.hubhead{flex:none;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 22px 10px;background:var(--board);box-shadow:0 8px 14px -10px rgba(0,0,0,.6);position:relative;z-index:2}
+.hubhead h1{font-family:var(--display);font-weight:600;font-size:clamp(26px,5vmin,46px);margin:0}
+.hubhead h1 span{color:var(--red)}
+.hubscroll{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 24px 32px}
+.hubgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(40vw,170px),1fr));gap:26px}
+.htile{height:clamp(130px,24vmin,180px);position:relative;min-height:0}
+.htile.rest{opacity:.38;filter:saturate(.4)}
+.htile .tick{position:absolute;top:8px;right:10px;font-family:var(--display);font-size:clamp(13px,2.4vmin,18px);color:#fff;background:rgba(0,0,0,.28);border-radius:999px;padding:2px 10px}
+.htile .restnote{position:absolute;left:0;right:0;bottom:8px;font-size:clamp(12px,2.2vmin,15px);color:#fff}
+.card .cardart{display:block;width:86%;height:86%}
+.card .cardart svg{width:100%;height:100%;display:block}
+.end>.note{margin:0}
+
 /* learning recap on the end screen */
 .end.withlearn{gap:16px;justify-content:flex-start;overflow:auto;padding-top:20px}
 .endhead{display:flex;align-items:center;gap:18px;justify-content:center;text-align:left}
@@ -674,8 +699,17 @@ function drawDots(){
   dotsEl.innerHTML='';
   for(var i=0;i<G.total;i++)dotsEl.appendChild(h('i',{class:i<G.i?'on':''}));
 }
+/* after two goes in a row on one game, she picks a different one */
+function canPlay(id){var L=S.lastPlayed;return S.rotate===false||!(L&&L.id===id&&L.n>=2);}
+function notePlay(id){var L=S.lastPlayed;if(L&&L.id===id)L.n++;else S.lastPlayed={id:id,n:1};save();}
+function nudge(el){
+  if(el){el.classList.remove('shake');void el.offsetWidth;el.classList.add('shake');}
+  sfx('soft');say('You have played that one twice. Let\u2019s try a different game!',true);
+}
 function startGame(def){
   if(limitReached())return allDone();
+  if(!canPlay(def.id)){home();return nudge();}
+  notePlay(def.id);
   screen='game';
   G={def:def,level:levelOf(def.id),i:0,mistakes:0,facts:[]};
   G.total=def.rounds(G.level);
@@ -1142,12 +1176,23 @@ var FACES=['🐱','🐶','🐸','🐷','🐮','🐔','🐟','🐝','🍎','🍌'
 var FACENAME={'🐱':'cat','🐶':'dog','🐸':'frog','🐷':'pig','🐮':'cow','🐔':'hen','🐟':'fish','🐝':'bee','🍎':'apple','🍌':'banana','🍇':'grapes','⭐':'star','🌙':'moon','🚗':'car','🚌':'bus','🚀':'rocket','⚽':'ball','🔑':'key','🔔':'bell','🌳':'tree'};
 var PAIRMODES={1:['pics'],2:['pics','dots'],3:['pics','words','dots'],4:['case','words','dots'],5:['sums','case','words']};
 var PAIRPROMPT={pics:'Find the pairs',dots:'Match each number to its dots',words:'Match each picture to its word',case:'Match big letters to small letters',sums:'Match each sum to its answer'};
-function dotsText(n){var s='';for(var i=0;i<n;i++){s+='●';if(i%5===4&&i<n-1)s+='\n';}return s;}
+var NUMWORD=['zero','one','two','three','four','five','six','seven','eight','nine','ten','eleven','twelve'];
+var DICE={1:[[50,50]],2:[[27,27],[73,73]],3:[[25,25],[50,50],[75,75]],4:[[27,27],[73,27],[27,73],[73,73]],
+  5:[[25,25],[75,25],[50,50],[25,75],[75,75]],6:[[30,22],[70,22],[30,50],[70,50],[30,78],[70,78]]};
+DICE[7]=[[22,20],[22,50],[22,80],[50,50],[78,20],[78,50],[78,80]];
+DICE[8]=[[22,20],[22,50],[22,80],[50,35],[50,65],[78,20],[78,50],[78,80]];
+DICE[9]=[[22,20],[22,50],[22,80],[50,20],[50,50],[50,80],[78,20],[78,50],[78,80]];
+DICE[10]=[[22,14],[22,38],[22,62],[22,86],[50,35],[50,65],[78,14],[78,38],[78,62],[78,86]];
+function dotsSvg(n){
+  var r=n<=6?12:(n<=9?10.5:9);
+  return'<svg viewBox="0 0 100 100" aria-hidden="true">'+DICE[n].map(function(p){
+    return'<circle fill="#f6b93b" stroke="#1f2a44" stroke-width="2.5" cx="'+p[0]+'" cy="'+p[1]+'" r="'+r+'"/>';}).join('')+'</svg>';
+}
 function pairDeck(level,mode){
   var np=[0,3,6,8,10,10][level],d=[];
   if(mode==='pics')sample(FACES,np).forEach(function(f){var nm=FACENAME[f];d.push({k:f,t:f,z:.56,say:nm,fact:f+' '+nm},{k:f,t:f,z:.56});});
   else if(mode==='dots'){
-    for(var n=1;n<=np;n++){d.push({k:n,t:String(n),z:.5,say:String(n),fact:dotsText(n).replace('\n','')+' = '+n},{k:n,t:dotsText(n),z:n>5?.17:.2,dots:true});}
+    for(var n=1;n<=Math.min(np,8);n++){d.push({k:n,t:String(n),z:.5,say:NUMWORD[n],fact:n+' is '+NUMWORD[n]+'.'},{k:n,html:dotsSvg(n),z:.2,dots:true});}
   }else if(mode==='words'){
     sample(level>=5?W4:W3,np).forEach(function(w){d.push({k:w[0],t:w[1],z:.5,say:w[0],fact:w[1]+' '+w[0]},{k:w[0],t:w[0],z:w[0].length>3?.24:.3,word:true});});
   }else if(mode==='case'){
@@ -1162,13 +1207,13 @@ var pairsGame={id:'pairs',name:'Pairs',c:'purple',
   play:function(level,stage,done){
     var g=G,modes=PAIRMODES[level],mode=nextOf(modes,'pairs'+level),deck=pairDeck(level,mode),n=deck.length,pairs=n/2;
     var info={};deck.forEach(function(c){if(c.fact)info[c.k]=c;});
-    var wide=window.innerWidth>window.innerHeight,cols=n===6?3:(n===12?(wide?4:3):(wide?n/4:4)),rows=n/cols;
-    var cs=Math.floor(Math.min((window.innerWidth-32-(cols-1)*12)/cols,(window.innerHeight-200-(rows-1)*12)/rows-6,150));
+    var cols=2,cs=0;
+    for(var c2=2;c2<=n;c2++){if(n%c2)continue;var r2=n/c2,sz=Math.floor(Math.min((window.innerWidth-40-(c2-1)*12)/c2,(window.innerHeight-210-(r2-1)*12)/r2-6,150));if(sz>cs){cs=sz;cols=c2;}}
     setPrompt(PAIRPROMPT[mode]);
     var open=[],found=0,miss=0,busy=false;
     var grid=h('div',{class:'cards',style:'grid-template-columns:repeat('+cols+',auto)'});
     deck.forEach(function(c){
-      var b=h('button',{class:'block card'+(c.dots?' dotcard':''),type:'button','aria-label':'Card',style:'width:'+cs+'px;height:'+cs+'px;font-size:'+Math.round(cs*c.z)+'px'},[h('span',{text:c.t})]);
+      var b=h('button',{class:'block card'+(c.dots?' dotcard':''),type:'button','aria-label':'Card',style:'width:'+cs+'px;height:'+cs+'px;font-size:'+Math.round(cs*c.z)+'px'},[c.html?h('span',{class:'cardart',html:c.html}):h('span',{text:c.t})]);
       b.addEventListener('click',function(){
         if(G!==g||busy||b.classList.contains('up'))return;
         b.classList.add('up');sfx('tick');open.push({b:b,k:c.k});
@@ -2186,7 +2231,7 @@ var capyGame={id:'capy',name:'Capy stack',c:'brown',
   }
 };
 
-var GAMES=[countGame,lettersGame,shapesGame,nextGame,pairsGame,copyGame,musicGame,lightGame,moleGame,brickGame,raceGame,capyGame];
+var GAMES=[countGame,lettersGame,shapesGame,nextGame,pairsGame,copyGame,lightGame,moleGame,brickGame,raceGame,capyGame];
 
 
 /* ---------- puzzles: a fresh layout every time, never the same one twice ---------- */
@@ -2211,6 +2256,8 @@ function solvedToday(id){var T=S.solved;return T&&T.day===dayNum()?(T[id]||0):0;
 function markSolved(id){var d=dayNum();if(!S.solved||S.solved.day!==d)S.solved={day:d};S.solved[id]=(S.solved[id]||0)+1;}
 function startPuzzle(def){
   if(limitReached())return allDone();
+  if(!canPlay(def.id)){home();return nudge();}
+  notePlay(def.id);
   screen='game';
   G={def:def,puzzle:true,i:0,total:0,mistakes:0};
   buildShell();
@@ -2219,11 +2266,15 @@ function startPuzzle(def){
 }
 function puzzleDone(def,stage,into){
   markSolved(def.id);save();
-  var nx=h('button',{class:'block go',type:'button',text:'Next puzzle'});
-  nx.addEventListener('click',function(){startPuzzle(def);});
-  var hm=h('button',{class:'block go alt',type:'button',text:'Choose a game'});
+  var hm=h('button',{class:'block go'+(canPlay(def.id)?' alt':''),type:'button',text:'Choose a game'});
   hm.addEventListener('click',home);
-  (into||stage).appendChild(h('div',{class:'endbtns'},[nx,hm]));
+  var btns=[hm];
+  if(canPlay(def.id)){
+    var nx=h('button',{class:'block go',type:'button',text:'Next puzzle'});
+    nx.addEventListener('click',function(){startPuzzle(def);});
+    btns.unshift(nx);
+  }else btns.unshift(h('p',{class:'note',text:'Time to try a different game!'}));
+  (into||stage).appendChild(h('div',{class:'endbtns'},btns));
 }
 function note(text){return h('p',{class:'note',text:text||''});}
 function actKeys(onDel,onGo){
@@ -2490,6 +2541,7 @@ var gardenPuz={id:'garden',name:'Word garden',
     setPrompt('Make '+GOAL+' words. Always use '+mid+'.');
   }
 };
+wordPuz.c='teal';sortPuz.c='magenta';gardenPuz.c='forest';
 var PUZZLES=[wordPuz,sortPuz,gardenPuz];
 
 /* ---------- screens ---------- */
@@ -2517,6 +2569,9 @@ function tileIcon(id){
     lights:'<svg viewBox="0 0 100 100"><g fill="#fff"><path d="M46 46 H6 A40 40 0 0 1 46 6Z"/><path d="M54 46 V6 A40 40 0 0 1 94 46Z" opacity=".45"/><path d="M46 54 V94 A40 40 0 0 1 6 54Z" opacity=".45"/><path d="M54 54 H94 A40 40 0 0 1 54 94Z" opacity=".45"/></g></svg>',
     race:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="32" y="8" width="36" height="62" rx="12"/><rect x="24" y="16" width="8" height="14" rx="3"/><rect x="68" y="16" width="8" height="14" rx="3"/><rect x="24" y="48" width="8" height="14" rx="3"/><rect x="68" y="48" width="8" height="14" rx="3"/></g><rect x="37" y="22" width="26" height="11" rx="4" fill="#1f6c96"/><rect x="47" y="8" width="6" height="62" fill="#e0584b"/><g fill="#fff" opacity=".55"><rect x="10" y="76" width="6" height="16"/><rect x="84" y="76" width="6" height="16"/><rect x="47" y="78" width="6" height="14"/></g></svg>',
     capy:'<svg viewBox="0 0 100 100"><circle cx="50" cy="14" r="11" fill="#f39a2b"/><ellipse cx="55" cy="4" rx="5" ry="2.4" fill="#3ea567"/><ellipse cx="28" cy="32" rx="7" ry="5" fill="#5a3a1c"/><ellipse cx="72" cy="32" rx="7" ry="5" fill="#5a3a1c"/><rect x="20" y="28" width="60" height="58" rx="22" fill="#e8c49a"/><rect x="29" y="56" width="42" height="26" rx="13" fill="#cfa477"/><ellipse cx="43" cy="63" rx="4" ry="2.4" fill="#3b2614"/><ellipse cx="57" cy="63" rx="4" ry="2.4" fill="#3b2614"/><g fill="none" stroke="#3b2614" stroke-width="2.6" stroke-linecap="round"><path d="M33 46 q4 -4 8 0"/><path d="M59 46 q4 -4 8 0"/><path d="M45 73 q5 4 10 0"/></g></svg>',
+    word:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="3" y="34" width="29" height="29" rx="6"/><rect x="36" y="34" width="29" height="29" rx="6" opacity=".6"/><rect x="69" y="34" width="29" height="29" rx="6" opacity=".3"/></g></svg>',
+    sort:'<svg viewBox="0 0 100 100"><g fill="#fff"><circle cx="20" cy="30" r="9"/><circle cx="34" cy="44" r="9"/><circle cx="16" cy="54" r="9"/><rect x="58" y="22" width="16" height="16" rx="3" opacity=".6"/><rect x="78" y="34" width="16" height="16" rx="3" opacity=".6"/><rect x="62" y="46" width="16" height="16" rx="3" opacity=".6"/><polygon points="50,66 62,88 38,88" opacity=".35"/></g></svg>',
+    garden:'<svg viewBox="0 0 100 100"><g fill="#fff"><circle cx="50" cy="26" r="13"/><circle cx="72" cy="42" r="13"/><circle cx="64" cy="66" r="13"/><circle cx="36" cy="66" r="13"/><circle cx="28" cy="42" r="13"/></g><circle cx="50" cy="48" r="11" fill="#e8b13f"/></svg>',
     bricks:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="4" y="8" width="28" height="12" rx="3"/><rect x="36" y="8" width="28" height="12" rx="3"/><rect x="68" y="8" width="28" height="12" rx="3" opacity=".45"/><rect x="20" y="24" width="28" height="12" rx="3" opacity=".45"/><rect x="52" y="24" width="28" height="12" rx="3"/><circle cx="60" cy="62" r="7"/><rect x="26" y="84" width="48" height="9" rx="4.5"/></g></svg>'
   };
   return h('span',{class:'ico','aria-hidden':'true',html:svg[id]});
@@ -2524,30 +2579,28 @@ function tileIcon(id){
 function home(fromPop){
   if(fromPop!==true&&inPlay){inPlay=false;try{history.back();}catch(e){}}
   screen='home';G=null;hush();
+  var keep=document.querySelector('.hubscroll'),top=keep?keep.scrollTop:0;
   $app.innerHTML='';
-  var tiles=h('div',{class:'tiles'});
-  GAMES.forEach(function(d){
-    var b=h('button',{class:'block tile',type:'button',style:'--c:var(--'+d.c+');--cd:var(--'+d.c+'-d)'},[tileIcon(d.id),h('span',{class:'nm',text:d.name})]);
-    b.addEventListener('click',function(){sfx('tick');startGame(d);});
-    tiles.appendChild(b);
+  var grid=h('div',{class:'hubgrid'});
+  [[countGame],[lettersGame],[wordPuz,1],[shapesGame],[nextGame],[sortPuz,1],[pairsGame],[gardenPuz,1],
+   [copyGame],[lightGame],[moleGame],[brickGame],[raceGame],[capyGame]].forEach(function(e){
+    var d=e[0],isP=!!e[1],n=isP?solvedToday(d.id):0,ok=canPlay(d.id);
+    var b=h('button',{class:'block tile htile'+(ok?'':' rest'),type:'button',style:'--c:var(--'+d.c+');--cd:var(--'+d.c+'-d)'},[
+      tileIcon(d.id),h('span',{class:'nm',text:d.name}),
+      n?h('span',{class:'tick',text:'✓ '+n}):null,
+      ok?null:h('span',{class:'restnote',text:'Try another game'})]);
+    b.addEventListener('click',function(){
+      if(!canPlay(d.id))return nudge(b);
+      sfx('tick');if(isP)startPuzzle(d);else startGame(d);
+    });
+    grid.appendChild(b);
   });
-  var tod=h('div',{class:'today'});
-  var PICO={word:['green','yellow','line'],sort:['blue','purple','pink'],garden:['line','yellow','line']};
-  PUZZLES.forEach(function(d){
-    var n=solvedToday(d.id);
-    var ico=h('span',{class:'ico','aria-hidden':'true'},PICO[d.id].map(function(c){return h('i',{style:'background:var(--'+c+')'});}));
-    var b=h('button',{class:'block dtile',type:'button'},[ico,h('span',{class:'nm',text:d.name}),n?h('span',{class:'tick',text:'✓ '+n}):null]);
-    b.addEventListener('click',function(){sfx('tick');startPuzzle(d);});
-    tod.appendChild(b);
-  });
-  $app.appendChild(h('div',{class:'home'},[
-    h('h1',{html:'Little <span>Sparks</span>'}),
-    h('p',{class:'lbl',text:'Puzzles'}),
-    tod,
-    h('p',{class:'lbl',text:'Games'}),
-    tiles,
-    h('div',{class:'homefoot'},[holdButton('Grown-ups: hold for 3 seconds',parent)])
+  var scroll=h('div',{class:'hubscroll'},[grid]);
+  $app.appendChild(h('div',{class:'hub'},[
+    h('div',{class:'hubhead'},[h('h1',{html:'Little <span>Sparks</span>'}),holdButton('Grown-ups (hold)',parent)]),
+    scroll
   ]));
+  scroll.scrollTop=top;
 }
 function adapt(g){
   var id=g.def.id;
@@ -2571,12 +2624,13 @@ function roundEnd(){
   $app.innerHTML='';
   var title=g.endTitle||'Well done!',card=learnCard(g);
   sfx('win');say(card?title+' '+card.short:title);
-  var again=h('button',{class:'block go alt',type:'button',text:'Play again'});
-  again.addEventListener('click',function(){startGame(g.def);});
+  var again=null;
+  if(canPlay(g.def.id)){again=h('button',{class:'block go alt',type:'button',text:'Play again'});again.addEventListener('click',function(){startGame(g.def);});}
   $app.appendChild(h('div',{class:'end'+(card?' withlearn':'')},[
     h('div',{class:'endhead'},[h('div',{class:'big',text:g.endIcon||'⭐'}),h('div',{},[h('h2',{text:title}),g.endNote?h('p',{text:g.endNote}):null])]),
     card?card.el:null,
-    h('div',{class:'endbtns'},[homeButton(),again])
+    h('div',{class:'endbtns'},[homeButton(),again]),
+    again?null:h('p',{class:'note',text:'Next time, try a different game!'})
   ]));
 }
 function allDone(){
@@ -2624,6 +2678,7 @@ function parent(){
   w.appendChild(h('p',{text:'Played today: '+mins+' min. Every game and puzzle can be played as often as she likes until the limit. Then the current round finishes and everything closes for the day.'}));
   w.appendChild(segRow('Daily limit',[[0,'Off'],[10,'10 min'],[15,'15 min'],[20,'20 min'],[30,'30 min'],[45,'45 min']],S.limit,function(v){S.limit=v;}));
   w.appendChild(segRow('Extra time today',[[S.bonus,(S.bonus/60)+' min added'],[S.bonus+600,'Add 10 min']],S.bonus,function(v){S.bonus=v;}));
+  w.appendChild(segRow('Different game after two goes',[[true,'On'],[false,'Off']],S.rotate!==false,function(v){S.rotate=v;}));
   w.appendChild(h('h3',{text:'Screen'}));
   w.appendChild(segRow('Colours',[['dark','Dark'],['light','Light']],S.theme,function(v){S.theme=v;}));
   w.appendChild(segRow('Warm night light',[[true,'On'],[false,'Off']],S.warm,function(v){S.warm=v;}));
