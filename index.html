@@ -33,6 +33,7 @@
   --sky:#2f95cc;   --sky-d:#1f6c96;
   --brown:#9a6a3c; --brown-d:#6c4823;
   --magenta:#b9548f;--magenta-d:#863a66;
+  --bad-bg:#4a2430;
   --forest:#4f8f45; --forest-d:#35662e;
   --display:"Fredoka","Trebuchet MS","Segoe UI",sans-serif;
   --body:"Andika","Comic Sans MS","Trebuchet MS",sans-serif; /* infant letterforms: single-storey a and g */
@@ -56,6 +57,7 @@
   --sky:#37a6e0;   --sky-d:#2479a8;
   --brown:#a8743f; --brown-d:#7a5226;
   --magenta:#c45a98;--magenta-d:#913f6f;
+  --bad-bg:#fbd9d4;
   --forest:#56994a; --forest-d:#3a6d32;
 }
 *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
@@ -314,6 +316,29 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+/* wrong answers: clear signal, then a new option grows in the same place */
+.choice.wrongflash,.ltile.wrongflash{background:var(--bad-bg);box-shadow:0 8px 0 var(--red-d);animation:shake .42s 2;position:relative}
+.choice.wrongflash::after,.ltile.wrongflash::after{content:"✗";position:absolute;top:2px;right:8px;font-family:var(--display);font-weight:600;font-size:min(6vmin,32px);line-height:1;color:var(--red)}
+.newin{animation:newin .5s ease-out}
+@keyframes newin{0%{transform:scale(.2) rotate(-10deg);opacity:0}70%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+/* difficulty slider in the header */
+.dslider{flex:1;max-width:420px;display:flex;align-items:center;gap:12px;margin:0 8px}
+.dtitle{font-family:var(--display);font-size:clamp(14px,2.6vmin,18px);color:var(--muted);white-space:nowrap}
+.dtrack{position:relative;flex:1;height:58px}
+.dtrack input{position:absolute;left:0;right:0;top:4px;width:100%;margin:0;height:32px;background:transparent;-webkit-appearance:none;appearance:none;cursor:pointer;touch-action:pan-x}
+.dtrack input::-webkit-slider-runnable-track{height:10px;border-radius:5px;background:linear-gradient(90deg,var(--green),var(--yellow),var(--red))}
+.dtrack input::-moz-range-track{height:10px;border-radius:5px;background:linear-gradient(90deg,var(--green),var(--yellow),var(--red))}
+.dtrack input::-webkit-slider-thumb{-webkit-appearance:none;width:32px;height:32px;margin-top:-11px;border-radius:50%;background:var(--ink);border:4px solid var(--board);box-shadow:0 2px 6px rgba(0,0,0,.4)}
+.dtrack input::-moz-range-thumb{width:26px;height:26px;border-radius:50%;background:var(--ink);border:4px solid var(--board)}
+.dtrack input:focus-visible{outline:3px solid var(--blue);outline-offset:2px;border-radius:8px}
+.dmarks{position:absolute;left:0;right:0;top:34px;height:22px}
+.dmark{position:absolute;top:6px;transform:translateX(-50%);border:0;background:none;padding:0 2px;font:inherit;font-size:clamp(11px,2.1vmin,14px);color:var(--muted);cursor:pointer;white-space:nowrap}
+.dmark::before{content:"";position:absolute;top:-9px;left:50%;width:3px;height:7px;border-radius:2px;background:var(--line);transform:translateX(-50%)}
+.dmark.on{color:var(--ink);font-weight:700}
+.dmark.on::before{background:var(--ink)}
+.hubhead{flex-wrap:wrap}
+@media (max-width:640px){.dslider{order:3;flex-basis:100%;max-width:none;margin:2px 0 0}}
+
 /* today's adventure */
 .htile.advtile{grid-column:1/-1;height:clamp(118px,21vmin,160px);background:linear-gradient(120deg,var(--orange),var(--magenta));box-shadow:0 8px 0 var(--magenta-d),0 12px 20px rgba(31,42,68,.12);color:#fff;gap:4px}
 .htile.advtile.fin{background:linear-gradient(120deg,var(--green),var(--teal));box-shadow:0 8px 0 var(--teal-d)}
@@ -771,8 +796,8 @@ function fromMix(list){
 function choiceQ(stage,o,done){
   setPrompt(o.prompt,o.spoken);
   if(o.show)stage.appendChild(o.show);
-  var row=h('div',{class:'choices'+(o.choices.length===6?' c3':'')}),wrong=0,locked=false,g=G;
-  o.choices.forEach(function(c){
+  var row=h('div',{class:'choices'+(o.choices.length===6?' c3':'')}),wrong=0,locked=false,g=G,spare=(o.spare||[]).slice();
+  function mk(c){
     var b=h('button',{class:'block choice'+(c.wide?' wide':''),type:'button','aria-label':c.label},[c.node]);
     if(c.ok)b.setAttribute('data-ok','1');
     b.addEventListener('click',function(){
@@ -782,22 +807,27 @@ function choiceQ(stage,o,done){
         if(o.after)o.after();if(o.fact)addFact(o.fact);
         done(o.word?example(o.word,stage,row):o.wait);
       }else{
-        wrong++;g.mistakes++;b.disabled=true;b.classList.add('nope');sfx('soft');
-        locked=true;row.classList.add('wait');
+        /* show clearly that it is wrong, then swap in a new option in the same spot */
+        wrong++;g.mistakes++;sfx('soft');locked=true;
+        b.classList.add('wrongflash');
         setTimeout(function(){
           if(G!==g)return;
-          var kids=Array.prototype.slice.call(row.children),was=kids.join(),k=0,nw;
-          do{nw=shuffle(kids);}while(kids.length>2&&nw.map(function(x){return kids.indexOf(x);}).every(function(v,i){return v===i;})&&++k<6);
-          nw.forEach(function(x){row.appendChild(x);});
-          row.classList.remove('wait');row.classList.remove('swap');void row.offsetWidth;row.classList.add('swap');
+          var nx=spare.shift();
+          if(nx){var nb=mk(nx);nb.classList.add('newin');row.replaceChild(nb,b);}
+          else{b.classList.remove('wrongflash');b.disabled=true;b.classList.add('nope');}
+          if(wrong>=3){var ok=row.querySelector('[data-ok]');if(ok)ok.classList.add('hint');}
           locked=false;
-        },650);
+        },1300);
       }
     });
-    row.appendChild(b);
-  });
+    return b;
+  }
+  o.choices.forEach(function(c){row.appendChild(mk(c));});
   stage.appendChild(row);
 }
+function numOpt(v){return{node:h('span',{class:'num',text:String(v)}),ok:false,label:String(v)};}
+function ltrOpt(x){return{node:h('span',{class:'ltr',text:x}),ok:false,label:x};}
+function shapeOpt(sh,c,level){return{node:shapeEl(sh,c,rotFor(sh,level||1)),ok:false,label:sh};}
 
 /* ---------- learning recap: every game ends by showing what she practised ---------- */
 function addFact(t){if(G&&G.facts&&t&&G.facts.indexOf(t)<0)G.facts.push(t);}
@@ -872,7 +902,9 @@ function numChoices(n,cands,k){
 function near(n){return[n-1,n+1,n-2,n+2,n+3];}
 function numQ(stage,prompt,show,n,done,cands,fact){
   lastN=n;
-  choiceQ(stage,{prompt:prompt,show:show,fact:fact,choices:numChoices(n,cands||near(n),4)},done);
+  var ch=numChoices(n,cands||near(n),4),seen={},sp=[];seen[n]=1;ch.forEach(function(c){seen[c.label]=1;});
+  for(var d=1;sp.length<6&&d<40;d++)[n+d,n-d].forEach(function(v){if(v>=0&&!seen[v]&&sp.length<6){seen[v]=1;sp.push(v);}});
+  choiceQ(stage,{prompt:prompt,show:show,fact:fact,choices:ch,spare:shuffle(sp).map(numOpt)},done);
 }
 function fresh(make){var v,i=0;do{v=make();}while(v.n===lastN&&++i<8);return v;}
 var COUNTQ={
@@ -887,10 +919,11 @@ var COUNTQ={
   subPic:function(st,done){var t=pick(THINGS),v=fresh(function(){var a=between(4,10),b=between(1,a-1);return{a:a,b:b,n:a-b};});
     numQ(st,v.a+' '+t[1]+'. Take away '+v.b+'. How many are left?',h('div',{class:'show'},[groupEl(rep(t[0],v.a),v.b)]),v.n,done,[v.a,v.b,v.n-1,v.n+1],v.a+' − '+v.b+' = '+v.n);},
   more:function(st,done){var ts=sample(THINGS,2),a=between(3,9),b;do{b=between(3,9);}while(b===a);
-    var more=rnd(2)===0,first=more?a>b:a<b;
+    var more=rnd(2)===0,first=more?a>b:a<b,big=Math.max(a,b),small=Math.min(a,b);
+    var msp=sample(THINGS.filter(function(t){return t!==ts[0]&&t!==ts[1];}),3).map(function(t){var c=more?between(1,big-1):between(small+1,10);return{node:groupEl(rep(t[0],c)),ok:false,wide:true,label:c+' '+t[1]};});
     choiceQ(st,{prompt:more?'Which group has more?':'Which group has fewer?',choices:[
       {node:groupEl(rep(ts[0][0],a)),ok:first,wide:true,label:a+' '+ts[0][1]},
-      {node:groupEl(rep(ts[1][0],b)),ok:!first,wide:true,label:b+' '+ts[1][1]}],fact:Math.max(a,b)+' is more than '+Math.min(a,b)+'.'},done);},
+      {node:groupEl(rep(ts[1][0],b)),ok:!first,wide:true,label:b+' '+ts[1][1]}],fact:Math.max(a,b)+' is more than '+Math.min(a,b)+'.',spare:msp},done);},
   diff:function(st,done){var ts=sample(THINGS,2),v=fresh(function(){var b=between(2,6),a=b+between(1,5);return{a:a,b:b,n:a-b};});
     numQ(st,'How many more '+ts[0][1]+' than '+ts[1][1]+'?',h('div',{class:'show col'},[groupEl(rep(ts[0][0],v.a)),groupEl(rep(ts[1][0],v.b))]),v.n,done,[v.a,v.b,v.n+1,v.n-1],v.a+' is '+v.n+' more than '+v.b+'.');},
   seq:function(st,done,level){
@@ -949,28 +982,30 @@ function spellQ(stage,w,extra,done){
   var tiles=letters.concat(sample(ABC.filter(function(x){return letters.indexOf(x)<0;}),extra));
   do{tiles=shuffle(tiles);}while(tiles.slice(0,letters.length).join('')===word);
   var row=h('div',{class:'choices'+five});
-  tiles.forEach(function(ch){
+  function mkTile(ch){
     var b=h('button',{class:'block ltile',type:'button',text:ch});
     b.addEventListener('click',function(){
-      if(G!==g||b.disabled||pos>=letters.length)return;
+      if(G!==g||b.disabled||pos>=letters.length||b.classList.contains('wrongflash'))return;
       if(ch===letters[pos]){
         slotEls[pos].textContent=ch;slotEls[pos].classList.add('filled');
         b.disabled=true;b.classList.add('used');pos++;
         if(pos===letters.length){sfx('good');addFact(w[1]+' '+word);done(example(word,stage,row));}else sfx('tick');
       }else{
-        if(row.classList.contains('wait'))return;
-        g.mistakes++;sfx('soft');
-        b.classList.remove('shake');void b.offsetWidth;b.classList.add('shake');
-        row.classList.add('wait');
+        g.mistakes++;sfx('soft');b.classList.add('wrongflash');
         setTimeout(function(){
           if(G!==g)return;
-          shuffle(Array.prototype.slice.call(row.children)).forEach(function(x){row.appendChild(x);});
-          row.classList.remove('wait');row.classList.remove('swap');void row.offsetWidth;row.classList.add('swap');
-        },550);
+          if(letters.indexOf(ch)<0){
+            var have=Array.prototype.map.call(row.children,function(x){return x.textContent;});
+            var pool=ABC.filter(function(x){return letters.indexOf(x)<0&&have.indexOf(x)<0;});
+            if(pool.length){var nb=mkTile(pick(pool));nb.classList.add('newin');row.replaceChild(nb,b);return;}
+          }
+          b.classList.remove('wrongflash');
+        },1200);
       }
     });
-    row.appendChild(b);
-  });
+    return b;
+  }
+  tiles.forEach(function(ch){row.appendChild(mkTile(ch));});
   stage.appendChild(row);
 }
 /* ---------- example sentences: shown and read aloud after a word is answered ---------- */
@@ -1045,22 +1080,22 @@ var LETQ={
   first:function(st,done){
     var w,i=0;do{w=pick(FIRST);}while(w[1]===lastWord&&++i<8);lastWord=w[1];
     var bad=w[0]==='c'?'k':(w[0]==='k'?'c':'');
-    var others=sample(ABC.filter(function(x){return x!==w[0]&&x!==bad;}),3);
-    choiceQ(st,{word:w[1],fact:w[2]+' '+w[1]+' starts with '+w[0]+'.',prompt:'What sound does this start with?',spoken:'What sound does '+w[1]+' start with?',show:picEl(w[2],w[1]),
+    var lpool=shuffle(ABC.filter(function(x){return x!==w[0]&&x!==bad;})),others=lpool.slice(0,3),sp=lpool.slice(3,8).map(ltrOpt);
+    choiceQ(st,{spare:sp,word:w[1],fact:w[2]+' '+w[1]+' starts with '+w[0]+'.',prompt:'What sound does this start with?',spoken:'What sound does '+w[1]+' start with?',show:picEl(w[2],w[1]),
       choices:shuffle(others.concat([w[0]])).map(function(x){return{node:h('span',{class:'ltr',text:x}),ok:x===w[0],label:x};})},done);
   },
   middle:function(st,done){
     var w=freshWord(CVC),v=w[0].charAt(1);
-    var others=sample('aeiou'.split('').filter(function(x){return x!==v;}),3);
-    choiceQ(st,{word:w[0],fact:w[1]+' '+w[0]+' has '+v+' in the middle.',prompt:'What sound is in the middle?',spoken:'What sound is in the middle of '+w[0]+'?',show:picEl(w[1],w[0]),
+    var vpool=shuffle('aeiou'.split('').filter(function(x){return x!==v;})),others=vpool.slice(0,3),sp=vpool.slice(3).map(ltrOpt);
+    choiceQ(st,{spare:sp,word:w[0],fact:w[1]+' '+w[0]+' has '+v+' in the middle.',prompt:'What sound is in the middle?',spoken:'What sound is in the middle of '+w[0]+'?',show:picEl(w[1],w[0]),
       choices:shuffle(others.concat([v])).map(function(x){return{node:h('span',{class:'ltr',text:x}),ok:x===v,label:x};})},done);
   },
   read:function(st,done,list){
     var w=freshWord(list);
     var same=list.filter(function(x){return x[0]!==w[0]&&x[0].charAt(0)===w[0].charAt(0);});
     var rest=list.filter(function(x){return x[0]!==w[0]&&x[0].charAt(0)!==w[0].charAt(0);});
-    var others=shuffle(same).concat(shuffle(rest)).slice(0,3);
-    choiceQ(st,{word:w[0],fact:w[1]+' '+w[0],prompt:'Which word matches the picture?',show:h('div',{class:'show'},[h('span',{class:'pic',text:w[1]})]),
+    var allw=shuffle(same).concat(shuffle(rest)),others=allw.slice(0,3),sp=allw.slice(3,8).map(function(x){return{node:h('span',{class:'wordtxt',text:x[0]}),ok:false,wide:true,label:x[0]};});
+    choiceQ(st,{spare:sp,word:w[0],fact:w[1]+' '+w[0],prompt:'Which word matches the picture?',show:h('div',{class:'show'},[h('span',{class:'pic',text:w[1]})]),
       choices:shuffle(others.concat([w])).map(function(x){return{node:h('span',{class:'wordtxt',text:x[0]}),ok:x[0]===w[0],wide:true,label:x[0]};})},done);
   }
 };
@@ -1088,8 +1123,9 @@ var lastShape='';
 function nameQ(st,done,pool,k,level){
   var opts,target,i=0,cols=shuffle(COLS);
   do{opts=sample(pool,k);target=pick(opts);}while(target===lastShape&&++i<8);
+  var sp=shuffle(pool.filter(function(x){return opts.indexOf(x)<0;})).slice(0,5).map(function(x){return shapeOpt(x,pick(COLS),level);});
   lastShape=target;
-  choiceQ(st,{fact:SHAPEFACT[target],prompt:'Tap the '+target,choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j%cols.length],rotFor(s,level)),ok:s===target,label:s};})},done);
+  choiceQ(st,{spare:sp,fact:SHAPEFACT[target],prompt:'Tap the '+target,choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j%cols.length],rotFor(s,level)),ok:s===target,label:s};})},done);
 }
 function sidesSet(){
   return sample([3,4,5,6,8],4).map(function(n){return{n:n,s:pick(BYSIDES[n])};});
@@ -1105,27 +1141,38 @@ var SHAPEQ={
     var ss=sample(S1,2),cs=sample(COLS,2),opts=[],t=rnd(4);
     ss.forEach(function(s){cs.forEach(function(c){opts.push({s:s,c:c});});});
     var target=opts[t];opts=shuffle(opts);
-    choiceQ(st,{fact:SHAPEFACT[target.s],prompt:'Tap the '+target.c+' '+target.s,choices:opts.map(function(o){return{node:shapeEl(o.s,o.c),ok:o===target,label:o.c+' '+o.s};})},done);
+    var sp=[],tries=0;while(sp.length<5&&tries++<60){var cs2=pick(S1),cc=pick(COLS);if((cs2===target.s&&cc===target.c)||opts.some(function(o){return o.s===cs2&&o.c===cc;})||sp.some(function(o){return o.s===cs2&&o.c===cc;}))continue;sp.push({s:cs2,c:cc});}
+    sp=sp.map(function(o){return{node:shapeEl(o.s,o.c),ok:false,label:o.c+' '+o.s};});
+    choiceQ(st,{spare:sp,fact:SHAPEFACT[target.s],prompt:'Tap the '+target.c+' '+target.s,choices:opts.map(function(o){return{node:shapeEl(o.s,o.c),ok:o===target,label:o.c+' '+o.s};})},done);
   },
   sides:function(st,done,l){
     var set=sidesSet(),target=pick(set),cols=shuffle(COLS),word=l>=4&&rnd(2)?'corners':'sides';
-    choiceQ(st,{fact:SHAPEFACT[target.s],prompt:'Which shape has '+target.n+' '+word+'?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
+    var names=set.map(function(o){return o.s;}),sp=[];
+    Object.keys(BYSIDES).forEach(function(k){if(+k!==target.n)BYSIDES[k].forEach(function(x){if(names.indexOf(x)<0)sp.push(x);});});
+    ['circle','oval'].forEach(function(x){sp.push(x);});
+    sp=shuffle(sp).slice(0,5).map(function(x){return shapeOpt(x,pick(COLS),l);});
+    choiceQ(st,{spare:sp,fact:SHAPEFACT[target.s],prompt:'Which shape has '+target.n+' '+word+'?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
   },
   most:function(st,done,l){
     var set=sidesSet(),most=l<5||rnd(2)===0,cols=shuffle(COLS);
     var target=set.reduce(function(a,b){return(most?b.n>a.n:b.n<a.n)?b:a;});
-    choiceQ(st,{fact:SHAPEFACT[target.s],prompt:most?'Which shape has the most sides?':'Which shape has the fewest sides?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
+    var names=set.map(function(o){return o.s;}),sp=[];
+    Object.keys(BYSIDES).forEach(function(k){if(most?+k<target.n:+k>target.n)BYSIDES[k].forEach(function(x){if(names.indexOf(x)<0)sp.push(x);});});
+    sp=shuffle(sp).slice(0,5).map(function(x){return shapeOpt(x,pick(COLS),l);});
+    choiceQ(st,{spare:sp,fact:SHAPEFACT[target.s],prompt:most?'Which shape has the most sides?':'Which shape has the fewest sides?',choices:set.map(function(o,j){return{node:shapeEl(o.s,cols[j],rotFor(o.s,l)),ok:o===target,label:o.s};})},done);
   },
   curvy:function(st,done){
     var good=pick(['circle','oval']),cols=shuffle(COLS);
-    var opts=shuffle(sample(['square','triangle','rectangle','pentagon','hexagon','diamond','star','trapezium'],3).concat([good]));
-    choiceQ(st,{fact:SHAPEFACT[good],prompt:'Which shape has no corners?',choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j]),ok:s===good,label:s};})},done);
+    var corner=shuffle(['square','triangle','rectangle','pentagon','hexagon','diamond','star','trapezium']);
+    var opts=shuffle(corner.slice(0,3).concat([good])),sp=corner.slice(3).map(function(x){return shapeOpt(x,pick(COLS),1);});
+    choiceQ(st,{spare:sp,fact:SHAPEFACT[good],prompt:'Which shape has no corners?',choices:opts.map(function(s,j){return{node:shapeEl(s,cols[j]),ok:s===good,label:s};})},done);
   },
   odd:function(st,done,l){
     var pool=l>=4?S3:S2,pair=sample(pool,2),k=l>=4?6:4,cols=shuffle(COLS),opts=[];
     for(var i=0;i<k-1;i++)opts.push({s:pair[0],odd:false});
     opts.push({s:pair[1],odd:true});opts=shuffle(opts);
-    choiceQ(st,{fact:SHAPEFACT[pair[1]],prompt:'Which is the odd one out?',choices:opts.map(function(o,j){return{node:shapeEl(o.s,cols[j%cols.length],rotFor(o.s,l)),ok:o.odd,label:o.s};})},done);
+    var sp=[0,1,2,3].map(function(){return shapeOpt(pair[0],pick(COLS),l);});
+    choiceQ(st,{spare:sp,fact:SHAPEFACT[pair[1]],prompt:'Which is the odd one out?',choices:opts.map(function(o,j){return{node:shapeEl(o.s,cols[j%cols.length],rotFor(o.s,l)),ok:o.odd,label:o.s};})},done);
   }
 };
 var SHAPEMIX={1:['n1'],2:['n2','n2','both'],3:['n3','sides','odd','d3a','both','n3'],4:['n3','d3b','sides','odd','most','curvy'],5:['all','sides','most','odd','curvy','d3b']};
@@ -1138,7 +1185,7 @@ var shapesGame={id:'shapes',name:'Shapes',c:'yellow',
 var BITS=[['circle','red'],['square','blue'],['triangle','yellow'],['star','green'],['heart','pink'],['diamond','purple']];
 function itemEl(it){return shapeEl(it.s,it.c,it.r||0);}
 function itemKey(it){return it.s+'|'+it.c+'|'+(it.r||0);}
-function patQ(stage,items,hide,opts,done,fact){
+function patQ(stage,items,hide,opts,done,fact,spareItems){
   var ans=items[hide],gap=null,seq=h('div',{class:'seq'});
   items.forEach(function(it,i){
     if(i===hide){gap=h('div',{class:'cell gap',text:'?'});seq.appendChild(gap);}
@@ -1149,6 +1196,7 @@ function patQ(stage,items,hide,opts,done,fact){
     show:h('div',{class:'show'},[seq]),
     choices:shuffle(opts).map(function(o){return{node:itemEl(o),ok:itemKey(o)===itemKey(ans),label:o.c+' '+o.s};}),
     fact:fact,
+    spare:(spareItems||[]).filter(function(o){return itemKey(o)!==itemKey(ans)&&!opts.some(function(x){return itemKey(x)===itemKey(o);});}).map(function(o){return{node:itemEl(o),ok:false,label:o.c+' '+o.s};}),
     after:function(){gap.textContent='';gap.classList.add('filled');gap.appendChild(itemEl(ans));}
   },done);
 }
@@ -1162,7 +1210,7 @@ var PATQ={
     var hide=level>=2&&rnd(2)?t.length-1-between(1,3):t.length-1;
     var unit=t;for(var u=1;u<t.length;u++){var ok=true;for(var q=0;q<t.length;q++)if(t.charAt(q)!==t.charAt(q%u)){ok=false;break;}if(ok){unit=t.slice(0,u);break;}}
     var pf=unit===t?'This pattern went forwards, then backwards.':'This pattern went '+unit.split('').map(function(k){return map[k].c+' '+map[k].s;}).join(', ')+', then started again.';
-    patQ(st,t.split('').map(function(k){return map[k];}),hide,used.map(function(k){return map[k];}),done,pf);
+    patQ(st,t.split('').map(function(k){return map[k];}),hide,used.map(function(k){return map[k];}),done,pf,'ABCD'.split('').filter(function(k){return used.indexOf(k)<0;}).map(function(k){return map[k];}).concat([{s:bits[4][0],c:bits[4][1]},{s:bits[5][0],c:bits[5][1]}]));
   },
   two:function(st,done,level){
     var flip=rnd(2),ps=flip?3:2,pc=flip?2:3;
@@ -1170,7 +1218,7 @@ var PATQ={
     for(var i=0;i<8;i++)items.push({s:sh[i%ps],c:co[i%pc]});
     var hide=level>=5||(level===4&&rnd(2))?between(3,6):7,a=items[hide];
     var os=sh[(sh.indexOf(a.s)+1)%ps],oc=co[(co.indexOf(a.c)+1)%pc];
-    patQ(st,items,hide,[a,{s:a.s,c:oc},{s:os,c:a.c},{s:os,c:oc}],done,'The shapes repeated every '+ps+' and the colours repeated every '+pc+'.');
+    patQ(st,items,hide,[a,{s:a.s,c:oc},{s:os,c:a.c},{s:os,c:oc}],done,'The shapes repeated every '+ps+' and the colours repeated every '+pc+'.',[].concat.apply([],sh.map(function(x){return co.map(function(y){return{s:x,c:y};});})));
   },
   turn:function(st,done,level){
     var step=level>=5?pick([45,-45,-90,135]):pick([90,-90]),start=rnd(4)*90,c=pick(COLS),items=[];
@@ -1178,7 +1226,7 @@ var PATQ={
     for(var i=0;i<6;i++)items.push({s:'arrow',c:c,r:norm(start+i*step)});
     var hide=level>=5&&rnd(2)?between(2,4):5,a=items[hide];
     var offs=Math.abs(step)===90?[90,180,270]:[45,-45,180];
-    patQ(st,items,hide,[a].concat(offs.map(function(o){return{s:'arrow',c:c,r:norm(a.r+o)};})),done,Math.abs(step)===90?'The arrow turned a quarter turn each time.':'The arrow turned the same amount each time.');
+    patQ(st,items,hide,[a].concat(offs.map(function(o){return{s:'arrow',c:c,r:norm(a.r+o)};})),done,Math.abs(step)===90?'The arrow turned a quarter turn each time.':'The arrow turned the same amount each time.',[0,45,90,135,180,225,270,315].map(function(r){return{s:'arrow',c:c,r:r};}));
   }
 };
 var PATMIX={1:['letters'],2:['letters'],3:['letters','letters','two'],4:['two','turn','letters'],5:['two','turn','two']};
@@ -2682,6 +2730,23 @@ function tileIcon(id){
   };
   return h('span',{class:'ico','aria-hidden':'true',html:svg[id]});
 }
+function diffSlider(){
+  var inp=h('input',{type:'range',min:'1',max:'5',step:'1',value:String(S.diff),'aria-label':'Difficulty','aria-valuetext':DIFFNAME[S.diff]});
+  var marks=h('div',{class:'dmarks'});
+  function set(v){
+    v=+v;inp.value=String(v);inp.setAttribute('aria-valuetext',DIFFNAME[v]);
+    Array.prototype.forEach.call(marks.children,function(m,i){m.classList.toggle('on',i+1===v);});
+    if(v===S.diff)return;
+    S.diff=v;S.off={};S.streak={};save();sfx('tick');say(DIFFNAME[v],true);
+  }
+  [1,2,3,4,5].forEach(function(v){
+    var m=h('button',{type:'button',class:'dmark'+(v===S.diff?' on':''),style:'left:calc(16px + (100% - 32px) * '+((v-1)/4)+')',text:DIFFNAME[v]});
+    m.addEventListener('click',function(){set(v);});
+    marks.appendChild(m);
+  });
+  inp.addEventListener('input',function(){set(inp.value);});
+  return h('div',{class:'dslider'},[h('span',{class:'dtitle',text:'Difficulty'}),h('div',{class:'dtrack'},[inp,marks])]);
+}
 function home(fromPop){
   if(fromPop!==true&&inPlay){inPlay=false;try{history.back();}catch(e){}}
   screen='home';G=null;hush();
@@ -2712,7 +2777,7 @@ function home(fromPop){
   grid.insertBefore(adv,grid.firstChild);
   var scroll=h('div',{class:'hubscroll'},[grid]);
   $app.appendChild(h('div',{class:'hub'},[
-    h('div',{class:'hubhead'},[h('h1',{html:'Little <span>Sparks</span>'}),holdButton('Grown-ups (hold)',parent)]),
+    h('div',{class:'hubhead'},[h('h1',{html:'Little <span>Sparks</span>'}),diffSlider(),holdButton('Grown-ups (hold)',parent)]),
     scroll
   ]));
   scroll.scrollTop=top;
