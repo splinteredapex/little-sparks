@@ -316,6 +316,9 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+.phead{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;position:sticky;top:-20px;margin:-20px -20px 0;padding:16px 20px 12px;background:var(--board);z-index:2;box-shadow:0 8px 14px -10px rgba(0,0,0,.6)}
+.phead .go{padding:12px 24px;font-size:clamp(17px,3vmin,22px)}
+
 /* wrong answers: clear signal, then a new option grows in the same place */
 .choice.wrongflash,.ltile.wrongflash{background:var(--bad-bg);box-shadow:0 8px 0 var(--red-d);animation:shake .42s 2;position:relative}
 .choice.wrongflash::after,.ltile.wrongflash::after{content:"✗";position:absolute;top:2px;right:8px;font-family:var(--display);font-weight:600;font-size:min(6vmin,32px);line-height:1;color:var(--red)}
@@ -566,7 +569,7 @@ function today(){return new Date().toDateString();}
 function rollDay(){if(S.day!==today()){S.day=today();S.used=0;S.bonus=0;save();}}
 function limitReached(){rollDay();return S.limit>0&&S.used>=S.limit*60+S.bonus;}
 /* one global difficulty (1 to 5); each game may drift one step either side of it */
-function levelOf(id){return clamp(S.diff+(S.adapt?(S.off[id]||0):0),1,5);}
+function levelOf(id){return clamp(S.diff,1,5);}
 var DIFFNAME=['','Starter','Easy','Steady','Tricky','Expert'];
 
 var screen='home';
@@ -2784,7 +2787,7 @@ function home(fromPop){
 }
 function adapt(g){
   var id=g.def.id;
-  if(S.adapt){
+  if(false){
     var off=S.off[id]||0;
     if(g.mistakes<=1){
       S.streak[id]=(S.streak[id]||0)+1;
@@ -2846,13 +2849,9 @@ function parent(){
   screen='parent';G=null;rollDay();hush();enterPlay();
   $app.innerHTML='';
   var w=h('div',{class:'parent'});
-  w.appendChild(h('h2',{text:'Grown-ups'}));
-  w.appendChild(h('h3',{text:'Difficulty'}));
-  w.appendChild(h('p',{text:'One setting drives every game and puzzle. Puzzles use the new level from the next one she opens.'}));
-  w.appendChild(segRow('All games',[1,2,3,4,5].map(function(v){return[v,v+' '+DIFFNAME[v]];}),S.diff,function(v){S.diff=v;S.off={};S.streak={};}));
-  w.appendChild(segRow('Fine-tune each game',[[true,'On'],[false,'Off']],S.adapt,function(v){S.adapt=v;}));
-  w.appendChild(h('p',{text:'With fine-tune on, a game steps up one level after two rounds with at most one slip, and down one after a hard round. Right now: '+
-    GAMES.map(function(d){return d.name+' '+levelOf(d.id);}).join(', ')+'.'}));
+  var back=h('button',{class:'block go',type:'button',text:'Back to the games'});
+  back.addEventListener('click',home);
+  w.appendChild(h('div',{class:'phead'},[h('h2',{text:'Grown-ups'}),back]));
   w.appendChild(h('h3',{text:'Play time'}));
   var mins=Math.floor(S.used/60);
   w.appendChild(h('p',{text:'Played today: '+mins+' min. Every game and puzzle can be played as often as she likes until the limit. Then the current round finishes and everything closes for the day.'}));
@@ -2879,9 +2878,6 @@ function parent(){
   var B=S.best||{},bl=[1,2,3,4,5].filter(function(l){return B[l];}).map(function(l){return'level '+l+': '+B[l];});
   w.appendChild(h('h3',{text:'Mole pop best scores'}));
   w.appendChild(h('p',{text:bl.length?bl.join(', ')+'.':'No scores yet.'}));
-  var back=h('button',{class:'block go',type:'button',text:'Back to the games'});
-  back.addEventListener('click',home);
-  w.appendChild(back);
   $app.appendChild(w);
   w.scrollTop=keep;
 }
