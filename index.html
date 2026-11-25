@@ -323,6 +323,24 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+/* home: category doors */
+.doors{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:16px}
+.doors.row4{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:minmax(0,1fr)}
+.door{height:auto!important;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:10px}
+.door .doorico{font-size:clamp(44px,14vmin,110px);line-height:1}
+.door .nm{font-family:var(--display);font-weight:500;font-size:clamp(17px,4.4vmin,30px);line-height:1.15;text-align:center}
+.door .doorsub{font-size:clamp(12px,2.8vmin,17px);opacity:.85}
+.door.rest{filter:saturate(.35) brightness(.8)}
+.catscreen{height:100%;display:flex;flex-direction:column;padding:12px 16px 18px;gap:12px}
+.cathead{display:flex;align-items:center;gap:12px;flex:none}
+.cattitle{flex:1;margin:0;display:flex;align-items:center;justify-content:center;gap:10px;font-family:var(--display);font-weight:500;font-size:clamp(20px,5vmin,32px);color:var(--ink)}
+.iconspacer{width:56px;flex:none}
+.catgrid{flex:1;min-height:0;display:grid;gap:14px}
+.catgrid .htile{height:auto!important;min-height:0;min-width:0}
+.catgrid .htile .ico{height:calc(var(--th)*.42);font-size:calc(var(--th)*.3);white-space:nowrap}
+.catgrid .htile .ico svg{height:100%;width:auto;max-width:80%}
+.catgrid .htile .nm{font-size:clamp(15px,calc(var(--th)*.13),26px);line-height:1.15;padding:0 6px;text-align:center}
+
 /* touch feedback */
 .block.pressed{transform:translateY(5px);filter:brightness(.92)}
 .wkey.pressed{transform:translateY(2px);filter:brightness(1.25)}
@@ -2983,6 +3001,7 @@ function advState(){
   return S.adv;
 }
 function startAdventure(){
+  openCat=null;
   if(limitReached())return allDone();
   if(!canPlay('adventure')){home();return nudge();}
   notePlay('adventure');
@@ -3104,12 +3123,12 @@ function diffSlider(){
   return h('div',{class:'dslider'},[h('span',{class:'dtitle',text:'Difficulty'}),h('div',{class:'dtrack'},[inp,marks])]);
 }
 var HOMECATS=[
-  {id:'words',label:'Words',icon:'📖',items:[[lettersGame],[wordPuz,1],[gardenPuz,1]]},
-  {id:'numbers',label:'Numbers & shapes',icon:'🔢',items:[[countGame],[shapesGame],[copyGame]]},
-  {id:'think',label:'Thinking & memory',icon:'🧠',items:[[nextGame],[sortPuz,1],[pairsGame],[lightGame],[trolleyGame],[spotGame]]},
-  {id:'quick',label:'Quick fingers',icon:'⚡',items:[[moleGame],[brickGame],[raceGame],[capyGame]]}
+  {id:'words',label:'Words',icon:'📖',c:'blue',items:[[lettersGame],[wordPuz,1],[gardenPuz,1]]},
+  {id:'numbers',label:'Numbers & shapes',icon:'🔢',c:'red',items:[[countGame],[shapesGame],[copyGame]]},
+  {id:'think',label:'Thinking & memory',icon:'🧠',c:'green',items:[[nextGame],[sortPuz,1],[pairsGame],[lightGame],[trolleyGame],[spotGame]]},
+  {id:'quick',label:'Quick fingers',icon:'⚡',c:'purple',items:[[moleGame],[brickGame],[raceGame],[capyGame]]}
 ];
-var ROWOFF={};
+var openCat=null;
 function gameTile(e){
   var d=e[0],isP=!!e[1],n=isP?solvedToday(d.id):0,ok=canPlay(d.id),left=2-playsToday(d.id);
   var b=h('button',{class:'block tile htile'+(ok?'':' rest'),type:'button',style:'--c:var(--'+d.c+');--cd:var(--'+d.c+'-d)'},[
@@ -3122,28 +3141,38 @@ function gameTile(e){
   });
   return b;
 }
-function catRow(cat,rowW,tileH){
-  var land=window.innerWidth>window.innerHeight,n=cat.items.length,arrowW=land?Math.min(56,Math.max(44,tileH*.45)):44,gap=land?12:8;
-  var minW=land?Math.max(118,Math.min(190,tileH*1.15)):Math.min(150,Math.max(112,tileH*.85));
-  var v=Math.max(1,Math.floor((rowW-2*(arrowW+gap)+gap)/(minW+gap)));
-  var fits=v>=n;if(fits){v=n;arrowW=0;}
-  var off=((ROWOFF[cat.id]||0)%n+n)%n;
-  var tiles=h('div',{class:'cattiles',style:'grid-template-columns:repeat('+v+',1fr)'});
-  function fill(dir){
-    tiles.innerHTML='';
-    for(var i=0;i<v;i++)tiles.appendChild(gameTile(cat.items[(off+i)%n]));
-    if(dir){tiles.classList.remove('slidel','slider');void tiles.offsetWidth;tiles.classList.add(dir>0?'slidel':'slider');}
-  }
-  function move(dir){off=(off+dir+n)%n;ROWOFF[cat.id]=off;sfx('tick');fill(dir);}
-  var kids=[];
-  if(!fits){var l=h('button',{class:'block catarrow',type:'button','aria-label':'More '+cat.label+' games',html:ICON.back});l.addEventListener('click',function(){move(-1);});kids.push(l);}
-  kids.push(tiles);
-  if(!fits){var r=h('button',{class:'block catarrow',type:'button','aria-label':'More '+cat.label+' games',html:ICON.back.replace('<svg ','<svg style="transform:scaleX(-1)" ')});r.addEventListener('click',function(){move(1);});kids.push(r);}
-  fill(0);
-  return h('div',{class:'cat'+(land?'':' port')},[h('div',{class:'catlbl'},[h('span',{class:'caticon',text:cat.icon}),h('span',{text:cat.label})]),h('div',{class:'catrow'},kids)]);
+function bestCols(n,W,H,gap){
+  var best=1,bs=0;
+  for(var c=1;c<=n;c++){var r=Math.ceil(n/c),w=(W-gap*(c-1))/c,hh=(H-gap*(r-1))/r,sz=Math.min(w,hh*1.25);if(sz>bs+1){bs=sz;best=c;}}
+  return best;
+}
+function openCategory(cat){
+  hush();screen='cat';openCat=cat;G=null;enterPlay();
+  $app.innerHTML='';stamp();
+  var back=h('button',{class:'block rbtn',type:'button','aria-label':'Back to the games',html:ICON.home});
+  back.addEventListener('click',function(){sfx('tick');home();});
+  var grid=h('div',{class:'catgrid'});
+  var wrap=h('div',{class:'catscreen',style:'--c:var(--'+cat.c+');--cd:var(--'+cat.c+'-d)'},[
+    h('div',{class:'cathead'},[back,h('h2',{class:'cattitle'},[h('span',{class:'caticon',text:cat.icon}),h('span',{text:cat.label})]),h('span',{class:'iconspacer'})]),
+    grid]);
+  $app.appendChild(wrap);
+  var n=cat.items.length,gap=14,W=grid.clientWidth,H=grid.clientHeight,cols=bestCols(n,W,H,gap),rows=Math.ceil(n/cols);
+  grid.style.gridTemplateColumns='repeat('+cols+',minmax(0,1fr))';
+  grid.style.gridTemplateRows='repeat('+rows+',minmax(0,1fr))';
+  var th=Math.min((H-gap*(rows-1))/rows,((W-gap*(cols-1))/cols)*0.8);
+  grid.style.setProperty('--th',Math.floor(th)+'px');
+  cat.items.forEach(function(e){grid.appendChild(gameTile(e));});
 }
 function home(fromPop){
+  var from=screen;
   if(G&&G.t0&&Date.now()-G.t0>=45000)countPlay(G);
+  /* back from a game goes to the category it came from */
+  if(openCat&&from==='game'){
+    var c=openCat;G=null;
+    if(fromPop===true)inPlay=false;
+    openCategory(c);return;
+  }
+  openCat=null;
   if(fromPop!==true&&inPlay){inPlay=false;try{history.back();}catch(e){}}
   screen='home';G=null;hush();
   $app.innerHTML='';stamp();
@@ -3153,20 +3182,23 @@ function home(fromPop){
     h('span',{class:'advicons','aria-hidden':'true',text:'📖🔢🧩🧠🎨'}),
     h('span',{class:'advtxt'},[h('span',{class:'nm',text:'Today’s adventure'}),h('span',{class:'advsub',text:sub})])]);
   adv.addEventListener('click',function(){sfx('tick');startAdventure();});
-  var body=h('div',{class:'hubbody'},[adv]);
-  var hub=h('div',{class:'hub'},[
+  var doors=h('div',{class:'doors'});
+  HOMECATS.forEach(function(cat){
+    var free=cat.items.filter(function(e){return canPlay(e[0].id);}).length;
+    var d=h('button',{class:'block tile door',type:'button',style:'--c:var(--'+cat.c+');--cd:var(--'+cat.c+'-d)'},[
+      h('span',{class:'doorico','aria-hidden':'true',text:cat.icon}),
+      h('span',{class:'nm',text:cat.label}),
+      h('span',{class:'doorsub',text:cat.items.length+' games'})]);
+    if(!free)d.classList.add('rest');
+    d.addEventListener('click',function(){sfx('tick');openCategory(cat);});
+    doors.appendChild(d);
+  });
+  var land=window.innerWidth>window.innerHeight*1.2;
+  doors.classList.toggle('row4',land);
+  $app.appendChild(h('div',{class:'hub'},[
     h('div',{class:'hubhead'},[h('h1',{html:'Little <span>Sparks</span>'}),diffSlider(),holdButton('Grown-ups (hold)',parent)]),
-    body
-  ]);
-  $app.appendChild(hub);
-  /* size the rows so all four categories fit on one screen */
-  var land=window.innerWidth>window.innerHeight,rowW=body.clientWidth-(land?150:0);
-  var avail=body.clientHeight-adv.offsetHeight-14-4*(land?10:30)-3*12;
-  var tileH=Math.floor(Math.max(70,Math.min(170,avail/4)));
-  var cats=h('div',{class:'cats'+(land?' landcats':'')});
-  HOMECATS.forEach(function(c){cats.appendChild(catRow(c,rowW,tileH));});
-  cats.style.setProperty('--th',tileH+'px');
-  body.appendChild(cats);
+    h('div',{class:'hubbody'},[adv,doors])
+  ]));
 }
 function adapt(g){
   var id=g.def.id;
@@ -3277,7 +3309,7 @@ function applyTheme(){
 
 /* ---------- back: device back button, back gesture or a swipe in from the left edge returns home ---------- */
 var inPlay=false,AUTO=location.hash==='#autopilot';
-window.addEventListener('resize',function(){if(screen==='home'){clearTimeout(window.__hr);window.__hr=setTimeout(function(){if(screen==='home')home(true);},150);}});
+window.addEventListener('resize',function(){if(screen==='home'||screen==='cat'){clearTimeout(window.__hr);window.__hr=setTimeout(function(){if(screen==='home')home(true);else if(screen==='cat'&&openCat)openCategory(openCat);},150);}});
 try{if(location.hash==='#play')history.replaceState(null,'',location.pathname+location.search);}catch(e){}
 function enterPlay(){if(inPlay)return;try{history.pushState({ls:1},'','#play');inPlay=true;}catch(e){}}
 window.addEventListener('popstate',function(){if(inPlay){inPlay=false;home(true);}});
