@@ -323,6 +323,16 @@ button:focus-visible{outline:4px solid var(--ink);outline-offset:3px}
 .parent .go{align-self:flex-start;font-size:20px;padding:14px 28px}
 
 /* ---------- v3 additions ---------- */
+/* balloon pop */
+.stage.balst .arena{flex:1}
+.arena.sky{background:linear-gradient(#bfe3ff,#e9f6ff)}
+:root:not([data-mode="light"]) .arena.sky{background:linear-gradient(#1d2a4a,#2b3b63)}
+.arena>.go{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);z-index:5}
+.btarget{display:flex;align-items:center;gap:8px;padding:4px 14px 4px 6px;border-radius:999px;background:var(--cell);font-weight:700;font-size:clamp(16px,3.6vmin,22px);color:var(--ink)}
+.bchip{width:26px;height:30px;border-radius:50% 50% 48% 48%;box-shadow:inset -4px -4px 0 rgba(0,0,0,.18)}
+.btarget.swap{animation:pulse .5s 3}
+.stage.balst .mhud{gap:12px;flex-wrap:wrap}
+
 /* home: category doors */
 .doors{flex:1;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,minmax(0,1fr));gap:16px}
 .doors.row4{grid-template-columns:repeat(4,minmax(0,1fr));grid-template-rows:minmax(0,1fr)}
@@ -997,6 +1007,7 @@ var LESSONS={
   moles:function(g){if(!g.score)return null;var pv=placeValue(g.score);return{lines:['You popped '+g.score+' moles.',pv.text],visual:pv.el};},
   bricks:function(g){if(!g.broken)return null;var pv=placeValue(g.broken);return{lines:['You broke '+g.broken+' bricks.',pv.text].concat(g.powers&&g.powers.length?['Power-ups you caught: '+g.powers.join(', ')+'.']:[]),visual:pv.el};},
   race:function(g){return{lines:[(g.stars?'You collected '+g.stars+' star'+(g.stars>1?'s':'')+'.':'You drove the whole way!'),'Road safety: '+nextOf(SAFETY,'tip')]};},
+  balloons:function(g){if(g.score==null)return null;var pv=placeValue(Math.max(1,g.score));var L=['You popped '+(g.score||0)+' balloon'+(g.score===1?'':'s')+'.'];if(g.score)L.push(pv.text);if(g.wrongPops)L.push(g.wrongPops+' pop'+(g.wrongPops===1?' was':'s were')+' the wrong colour. Look before you tap!');else L.push('Every pop was the right colour. Great looking!');return{lines:L,visual:g.score?pv.el:null};},
   capy:function(g){return{lines:['You stacked '+(g.stacked||0)+' orange'+(g.stacked===1?'':'s')+'.','Capybara fact: '+nextOf(CAPYFACTS,'capyfact')]};}
 };
 function learnCard(g){
@@ -2663,7 +2674,143 @@ var spotGame={id:'spot',name:'Spot the difference',c:'cyan',
   }
 };
 
-var GAMES=[countGame,lettersGame,shapesGame,nextGame,pairsGame,copyGame,lightGame,moleGame,brickGame,raceGame,capyGame,trolleyGame,spotGame];
+
+/* ---------- Balloon pop (real time) ---------- */
+var BALLOONCOL=[
+  {n:'red',c:'#e5483d',d:'#a92f27'},{n:'blue',c:'#3f86d4',d:'#295f9c'},{n:'yellow',c:'#f3c43b',d:'#b58d1c'},
+  {n:'green',c:'#3ea567',d:'#277447'},{n:'purple',c:'#8a63d2',d:'#5c4196'},{n:'orange',c:'#f0893c',d:'#b35f21'},{n:'pink',c:'#ee6fa0',d:'#b04772'}];
+var balloonGame={id:'balloons',name:'Balloon pop',c:'magenta',
+  rounds:function(){return 1;},
+  play:function(level,stage,done){
+    var g=G,DUR=40000;
+    var nCol=[0,3,4,5,6,7][level],speed=[0,.11,.15,.2,.26,.32][level],every=[0,1.05,.8,.6,.46,.36][level];
+    var swap=[0,0,0,14000,12000,10000][level],wrongCost=level>=3?1:0,sizeK=[0,.1,.092,.084,.076,.07][level];
+    var cols=sample(BALLOONCOL,nCol),target=pick(cols);
+    S.bestB=S.bestB||{};
+    var best=S.bestB[level]||0,score=0,popped={},wrong=0,missed=0,running=false,endAt=0,nextSwap=0,tick=null;
+    setPrompt('Pop the '+target.n+' balloons!');
+    stage.classList.add('top','balst');
+    var sc=h('span',{class:'msc',text:'0'}),bar=h('i'),bestEl=h('span',{class:'mbest',text:best?'Best '+best:'No best yet'});
+    var chip=h('span',{class:'bchip'}),chipTxt=h('span',{text:target.n});
+    var tgt=h('span',{class:'btarget'},[chip,chipTxt]);
+    function paintChip(){chip.style.background=target.c;chipTxt.textContent=target.n;}
+    paintChip();
+    var hud=h('div',{class:'mhud'},[sc,tgt,h('div',{class:'tbar'},[bar]),bestEl]);
+    var arena=h('div',{class:'arena sky'}),cv=h('canvas',{'aria-label':'Balloons floating up. Tap the right colour.'});
+    var go=h('button',{class:'block go',type:'button',text:'Start'});
+    arena.appendChild(cv);arena.appendChild(go);
+    stage.appendChild(hud);stage.appendChild(arena);
+    var ctx=cv.getContext('2d'),W=0,H=0,base=30,balls=[],bits=[],texts=[],spawnT=0,last=0;
+    var dark=document.documentElement.getAttribute('data-mode')!=='light';
+    function layout(){
+      var r=arena.getBoundingClientRect(),dpr=Math.min(window.devicePixelRatio||1,2);
+      W=r.width;H=r.height;if(W<10||H<10)return;
+      cv.width=Math.round(W*dpr);cv.height=Math.round(H*dpr);ctx.setTransform(dpr,0,0,dpr,0,0);
+      base=Math.max(22,Math.min(W*1.15,H)*sizeK);
+    }
+    function onResize(){if(G!==g){window.removeEventListener('resize',onResize);return;}layout();}
+    window.addEventListener('resize',onResize);
+    function spawn(){
+      var k=.7+Math.random()*.6,r=base*k;
+      /* about two in five balloons are the target colour */
+      var col=Math.random()<.4?target:pick(cols.filter(function(c){return c!==target;}));
+      var x=r+Math.random()*(W-2*r);
+      for(var tries=0;tries<4;tries++){var clash=balls.some(function(b){return b.y>H-b.r*3&&Math.abs(b.x-x)<b.r+r;});if(!clash)break;x=r+Math.random()*(W-2*r);}
+      balls.push({x:x,x0:x,y:H+r*2.2,r:r,col:col,v:H*speed*(1.25-k*.35)*(.85+Math.random()*.3),ph:Math.random()*6,sw:r*(.2+Math.random()*.3)});
+    }
+    function hitAt(px,py){
+      for(var i=balls.length-1;i>=0;i--){
+        var b=balls[i],dx=(px-b.x)/(b.r*1.18),dy=(py-b.y)/(b.r*1.35);
+        if(dx*dx+dy*dy<=1)return i;
+      }
+      return -1;
+    }
+    function pop(i){
+      var b=balls[i];balls.splice(i,1);
+      for(var k=0;k<10;k++){var a=Math.PI*2*k/10+Math.random()*.4;bits.push({x:b.x,y:b.y,vx:Math.cos(a)*b.r*4,vy:Math.sin(a)*b.r*4,life:.45,c:b.col.c});}
+      if(b.col===target){
+        score++;popped[b.col.n]=(popped[b.col.n]||0)+1;ping(Math.min(7,score%8));
+        texts.push({x:b.x,y:b.y,t:'+1',life:.8,c:dark?'#fff':'#1f2a44'});
+      }else{
+        wrong++;g.mistakes++;score=Math.max(0,score-wrongCost);buzz();
+        texts.push({x:b.x,y:b.y,t:wrongCost?'-1':'Oops',life:.9,c:'#e5483d'});
+      }
+      sc.textContent=String(score);
+    }
+    cv.addEventListener('pointerdown',function(e){
+      e.preventDefault();if(!running)return;
+      var r=cv.getBoundingClientRect(),i=hitAt(e.clientX-r.left,e.clientY-r.top);
+      if(i>=0)pop(i);
+    });
+    function newTarget(){
+      var old=target;target=pick(cols.filter(function(c){return c!==old;}));
+      paintChip();tgt.classList.remove('swap');void tgt.offsetWidth;tgt.classList.add('swap');
+      promptEl.textContent='Now pop the '+target.n+' balloons!';say('Now pop the '+target.n+' ones!');
+    }
+    function begin(){
+      if(running)return;
+      go.style.display='none';running=true;endAt=Date.now()+DUR;nextSwap=swap?Date.now()+swap:0;
+      sfx('tick');spawnT=.2;
+      tick=setInterval(function(){
+        if(G!==g){clearInterval(tick);return;}
+        var now=Date.now(),left=Math.max(0,endAt-now);
+        bar.style.setProperty('--t',String(left/DUR));
+        if(left<6000)bar.style.background='var(--red)';
+        if(nextSwap&&now>=nextSwap&&left>4000){nextSwap=now+swap;newTarget();}
+        if(left<=0)finish();
+      },100);
+    }
+    go.addEventListener('click',begin);
+    function finish(){
+      running=false;clearInterval(tick);
+      g.score=score;g.popped=popped;g.wrongPops=wrong;g.missed=missed;g.target=target.n;
+      var newBest=score>best;
+      if(newBest){S.bestB[level]=score;save();}
+      g.endIcon=newBest?'🏆':'🎈';
+      g.endTitle=newBest?'New best score: '+score+'!':'You scored '+score+'!';
+      g.endNote=newBest?(best?'Your old best was '+best+'.':'That is your first best score.'):'Your best is '+best+'. Can you beat it?';
+      promptEl.textContent='Time is up!';sfx('win');
+      setTimeout(function(){if(G===g)done(300);},1300);
+    }
+    function balloon(b){
+      var r=b.r,x=b.x,y=b.y;
+      ctx.strokeStyle=dark?'rgba(255,255,255,.55)':'rgba(31,42,68,.45)';ctx.lineWidth=1.5;ctx.beginPath();
+      ctx.moveTo(x,y+r*1.25);
+      for(var k=1;k<=6;k++)ctx.lineTo(x+Math.sin(b.ph*2+k)*r*.12,y+r*1.25+k*r*.32);
+      ctx.stroke();
+      ctx.fillStyle=b.col.d;ctx.beginPath();ctx.moveTo(x,y+r*1.08);ctx.lineTo(x-r*.16,y+r*1.3);ctx.lineTo(x+r*.16,y+r*1.3);ctx.closePath();ctx.fill();
+      ctx.fillStyle=b.col.c;ctx.beginPath();ctx.ellipse(x,y,r,r*1.15,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=b.col.d;ctx.lineWidth=2;ctx.stroke();
+      ctx.fillStyle='rgba(255,255,255,.45)';ctx.beginPath();ctx.ellipse(x-r*.38,y-r*.45,r*.18,r*.3,-.5,0,Math.PI*2);ctx.fill();
+    }
+    function frame(ts){
+      if(G!==g){window.removeEventListener('resize',onResize);return;}
+      if(!W)layout();
+      var dt=last?Math.min(.05,(ts-last)/1000):0;last=ts;
+      if(running){
+        spawnT-=dt;
+        if(spawnT<=0){spawn();if(level>=4&&Math.random()<.35)spawn();spawnT=every*(.7+Math.random()*.6);}
+        if(AUTO&&Math.random()<dt*2.5){for(var a=0;a<balls.length;a++)if(balls[a].col===target&&balls[a].y<H*.8){pop(a);break;}}
+      }
+      balls.forEach(function(b){b.y-=b.v*dt;b.ph+=dt*1.6;b.x=b.x0+Math.sin(b.ph)*b.sw;});
+      balls=balls.filter(function(b){var gone=b.y<-b.r*3;if(gone&&b.col===target&&running)missed++;return !gone;});
+      bits.forEach(function(p){p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=H*.8*dt;p.life-=dt;});
+      bits=bits.filter(function(p){return p.life>0;});
+      texts.forEach(function(t){t.y-=40*dt;t.life-=dt;});texts=texts.filter(function(t){return t.life>0;});
+      ctx.clearRect(0,0,W,H);
+      balls.forEach(balloon);
+      bits.forEach(function(p){ctx.globalAlpha=Math.max(0,p.life/.45);ctx.fillStyle=p.c;ctx.fillRect(p.x-3,p.y-3,6,6);});
+      ctx.globalAlpha=1;
+      texts.forEach(function(t){ctx.globalAlpha=Math.min(1,t.life*2);ctx.fillStyle=t.c;ctx.font='700 '+Math.round(base*.8)+'px system-ui,sans-serif';ctx.textAlign='center';ctx.fillText(t.t,t.x,t.y);});
+      ctx.globalAlpha=1;
+      requestAnimationFrame(frame);
+    }
+    requestAnimationFrame(function(){layout();requestAnimationFrame(frame);});
+    if(AUTO)setTimeout(begin,300);
+  }
+};
+
+var GAMES=[countGame,lettersGame,shapesGame,nextGame,pairsGame,copyGame,lightGame,moleGame,brickGame,raceGame,capyGame,trolleyGame,spotGame,balloonGame];
 
 
 /* ---------- puzzles: a fresh layout every time, never the same one twice ---------- */
@@ -3096,6 +3243,7 @@ function tileIcon(id){
     lights:'<svg viewBox="0 0 100 100"><g fill="#fff"><path d="M46 46 H6 A40 40 0 0 1 46 6Z"/><path d="M54 46 V6 A40 40 0 0 1 94 46Z" opacity=".45"/><path d="M46 54 V94 A40 40 0 0 1 6 54Z" opacity=".45"/><path d="M54 54 H94 A40 40 0 0 1 54 94Z" opacity=".45"/></g></svg>',
     race:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="32" y="8" width="36" height="62" rx="12"/><rect x="24" y="16" width="8" height="14" rx="3"/><rect x="68" y="16" width="8" height="14" rx="3"/><rect x="24" y="48" width="8" height="14" rx="3"/><rect x="68" y="48" width="8" height="14" rx="3"/></g><rect x="37" y="22" width="26" height="11" rx="4" fill="#1f6c96"/><rect x="47" y="8" width="6" height="62" fill="#e0584b"/><g fill="#fff" opacity=".55"><rect x="10" y="76" width="6" height="16"/><rect x="84" y="76" width="6" height="16"/><rect x="47" y="78" width="6" height="14"/></g></svg>',
     capy:'<svg viewBox="0 0 100 100"><circle cx="50" cy="14" r="11" fill="#f39a2b"/><ellipse cx="55" cy="4" rx="5" ry="2.4" fill="#3ea567"/><ellipse cx="28" cy="32" rx="7" ry="5" fill="#5a3a1c"/><ellipse cx="72" cy="32" rx="7" ry="5" fill="#5a3a1c"/><rect x="20" y="28" width="60" height="58" rx="22" fill="#e8c49a"/><rect x="29" y="56" width="42" height="26" rx="13" fill="#cfa477"/><ellipse cx="43" cy="63" rx="4" ry="2.4" fill="#3b2614"/><ellipse cx="57" cy="63" rx="4" ry="2.4" fill="#3b2614"/><g fill="none" stroke="#3b2614" stroke-width="2.6" stroke-linecap="round"><path d="M33 46 q4 -4 8 0"/><path d="M59 46 q4 -4 8 0"/><path d="M45 73 q5 4 10 0"/></g></svg>',
+    balloons:'<svg viewBox="0 0 100 100"><path d="M30 62 Q28 80 36 96" fill="none" stroke="#fff" stroke-width="2.5"/><path d="M66 58 Q70 78 62 96" fill="none" stroke="#fff" stroke-width="2.5"/><ellipse cx="30" cy="38" rx="19" ry="23" fill="#fff"/><ellipse cx="66" cy="34" rx="17" ry="21" fill="#fff" opacity=".75"/><ellipse cx="23" cy="29" rx="4" ry="7" fill="#b9548f" opacity=".35"/></svg>',
     trolley:'<svg viewBox="0 0 100 100"><path d="M6 22 H18 L28 66 H86 L94 34 H24" fill="none" stroke="#fff" stroke-width="7" stroke-linecap="round" stroke-linejoin="round"/><circle cx="36" cy="82" r="7" fill="#fff"/><circle cx="78" cy="82" r="7" fill="#fff"/><circle cx="46" cy="40" r="9" fill="#fff" opacity=".7"/><circle cx="66" cy="44" r="8" fill="#fff" opacity=".7"/></svg>',
     spot:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="4" y="22" width="42" height="56" rx="6" opacity=".9"/><rect x="54" y="22" width="42" height="56" rx="6" opacity=".9"/></g><circle cx="25" cy="44" r="8" fill="#22a6a1"/><circle cx="75" cy="44" r="8" fill="#e0584b"/><circle cx="75" cy="44" r="15" fill="none" stroke="#fff" stroke-width="4" stroke-dasharray="6 4"/></svg>',
     word:'<svg viewBox="0 0 100 100"><g fill="#fff"><rect x="3" y="34" width="29" height="29" rx="6"/><rect x="36" y="34" width="29" height="29" rx="6" opacity=".6"/><rect x="69" y="34" width="29" height="29" rx="6" opacity=".3"/></g></svg>',
@@ -3126,7 +3274,7 @@ var HOMECATS=[
   {id:'words',label:'Words',icon:'📖',c:'blue',items:[[lettersGame],[wordPuz,1],[gardenPuz,1]]},
   {id:'numbers',label:'Numbers & shapes',icon:'🔢',c:'red',items:[[countGame],[shapesGame],[copyGame]]},
   {id:'think',label:'Thinking & memory',icon:'🧠',c:'green',items:[[nextGame],[sortPuz,1],[pairsGame],[lightGame],[trolleyGame],[spotGame]]},
-  {id:'quick',label:'Quick fingers',icon:'⚡',c:'purple',items:[[moleGame],[brickGame],[raceGame],[capyGame]]}
+  {id:'quick',label:'Quick fingers',icon:'⚡',c:'purple',items:[[moleGame],[balloonGame],[brickGame],[raceGame],[capyGame]]}
 ];
 var openCat=null;
 function gameTile(e){
@@ -3309,7 +3457,11 @@ function applyTheme(){
 
 /* ---------- back: device back button, back gesture or a swipe in from the left edge returns home ---------- */
 var inPlay=false,AUTO=location.hash==='#autopilot';
-window.addEventListener('resize',function(){if(screen==='home'||screen==='cat'){clearTimeout(window.__hr);window.__hr=setTimeout(function(){if(screen==='home')home(true);else if(screen==='cat'&&openCat)openCategory(openCat);},150);}});
+var lastWH=innerWidth+'x'+innerHeight;
+window.addEventListener('resize',function(){if(screen==='home'||screen==='cat'){clearTimeout(window.__hr);window.__hr=setTimeout(function(){
+  var wh=innerWidth+'x'+innerHeight;if(wh===lastWH)return;lastWH=wh;var ls=lastStamp;
+  if(screen==='home')home(true);else if(screen==='cat'&&openCat)openCategory(openCat);
+  lastStamp=ls;},150);}});
 try{if(location.hash==='#play')history.replaceState(null,'',location.pathname+location.search);}catch(e){}
 function enterPlay(){if(inPlay)return;try{history.pushState({ls:1},'','#play');inPlay=true;}catch(e){}}
 window.addEventListener('popstate',function(){if(inPlay){inPlay=false;home(true);}});
@@ -3341,7 +3493,7 @@ home();
 /* installed app: work offline, and ask the browser to keep her progress */
 try{if('serviceWorker' in navigator)navigator.serviceWorker.register('sw.js');}catch(e){}
 try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
-if(location.search.indexOf('test=1')>=0)window.__T={home:home,startGame:startGame,startPuzzle:startPuzzle,G:function(){return G;},S:S,g:{countGame:countGame,lettersGame:lettersGame,shapesGame:shapesGame,nextGame:nextGame,pairsGame:pairsGame,copyGame:copyGame,lightGame:lightGame,moleGame:moleGame,brickGame:brickGame,raceGame:raceGame,capyGame:capyGame,trolleyGame:trolleyGame,spotGame:spotGame,wordPuz:wordPuz,sortPuz:sortPuz,gardenPuz:gardenPuz}};
+if(location.search.indexOf('test=1')>=0)window.__T={home:home,startGame:startGame,startPuzzle:startPuzzle,G:function(){return G;},S:S,g:{countGame:countGame,lettersGame:lettersGame,shapesGame:shapesGame,nextGame:nextGame,pairsGame:pairsGame,copyGame:copyGame,lightGame:lightGame,moleGame:moleGame,brickGame:brickGame,raceGame:raceGame,capyGame:capyGame,trolleyGame:trolleyGame,spotGame:spotGame,balloonGame:balloonGame,wordPuz:wordPuz,sortPuz:sortPuz,gardenPuz:gardenPuz}};
 })();
 </script>
 </body>
